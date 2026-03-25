@@ -16,7 +16,7 @@ class EqualizerEngine(audioSessionId: Int) {
         bands.forEachIndexed { index, band ->
             if (index < equalizer.numberOfBands) {
                 // Convert dB to millibels (1 dB = 100 millibels)
-                val millibels = (band.gain * 100).toInt().toShort()
+                val millibels = (band.gainDb * 100).toInt().toShort()
                 equalizer.setBandLevel(index.toShort(), millibels)
             }
         }
