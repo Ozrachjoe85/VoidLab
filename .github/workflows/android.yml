@@ -33,31 +33,3 @@ jobs:
       with:
         name: void-lab-release
         path: app/build/outputs/apk/release/app-release.apk
-```
-
-### **Option B: Download the JAR Manually**
-
-Download from here and upload to your repo at `gradle/wrapper/gradle-wrapper.jar`:
-https://raw.githubusercontent.com/gradle/gradle/v8.2.0/gradle/wrapper/gradle-wrapper.jar
-
----
-
-## 🚀 **DEPLOYMENT STEPS**
-
-1. **Replace `.github/workflows/android.yml`** with the corrected version above
-2. **Add `gradlew`** file (mark as executable in git - GitHub does this automatically for shell scripts)
-3. **Add `gradlew.bat`** file
-4. **Commit and push**
-
-The workflow will now:
-1. Generate the Gradle wrapper JAR automatically
-2. Build your APK
-3. Upload it using the new v4 artifact action
-
----
-
-## 🎯 **Quick Fix Summary**
-
-**The error you got:**
-```
-deprecated version of `actions/upload-artifact: v3`
