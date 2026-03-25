@@ -2,73 +2,67 @@ package com.voidlab.player.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.voidlab.player.audio.playback.PlaybackManager
 import com.voidlab.player.data.models.Song
-import com.voidlab.player.data.repository.FavoriteRepository
 import com.voidlab.player.data.repository.MusicRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class SortMode {
+    TITLE, ARTIST, ALBUM, DATE_ADDED, DURATION
+}
+
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
-    private val musicRepository: MusicRepository,
-    private val playbackManager: PlaybackManager,
-    private val favoriteRepository: FavoriteRepository
+    private val musicRepository: MusicRepository
 ) : ViewModel() {
     
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
     
-    private val _sortOrder = MutableStateFlow(SortOrder.TITLE)
-    val sortOrder: StateFlow<SortOrder> = _sortOrder.asStateFlow()
+    private val _sortMode = MutableStateFlow(SortMode.TITLE)
+    val sortMode: StateFlow<SortMode> = _sortMode.asStateFlow()
     
-    val songs: StateFlow<List<Song>> = musicRepository.getSongs()
-        .combine(searchQuery) { songs, query ->
-            if (query.isBlank()) songs
-            else songs.filter {
-                it.title.contains(query, ignoreCase = true) ||
-                it.artist.contains(query, ignoreCase = true) ||
-                it.album.contains(query, ignoreCase = true)
+    val songs: StateFlow<List<Song>> = combine(
+        musicRepository.songs,
+        searchQuery,
+        sortMode
+    ) { songs, query, sort ->
+        val filtered = if (query.isBlank()) {
+            songs
+        } else {
+            songs.filter { song ->
+                song.title.contains(query, ignoreCase = true) ||
+                song.artist.contains(query, ignoreCase = true) ||
+                song.album.contains(query, ignoreCase = true)
             }
         }
-        .combine(sortOrder) { songs, order ->
-            when (order) {
-                SortOrder.TITLE -> songs.sortedBy { it.title }
-                SortOrder.ARTIST -> songs.sortedBy { it.artist }
-                SortOrder.ALBUM -> songs.sortedBy { it.album }
-                SortOrder.DATE_ADDED -> songs.sortedByDescending { it.dateAdded }
-            }
+        
+        when (sort) {
+            SortMode.TITLE -> filtered.sortedBy { it.title.lowercase() }
+            SortMode.ARTIST -> filtered.sortedBy { it.artist.lowercase() }
+            SortMode.ALBUM -> filtered.sortedBy { it.album.lowercase() }
+            SortMode.DATE_ADDED -> filtered.sortedByDescending { it.dateAdded }
+            SortMode.DURATION -> filtered.sortedByDescending { it.duration }
         }
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     
-    val currentlyPlayingSong: StateFlow<Song?> = playbackManager.currentSong
+    init {
+        loadSongs()
+    }
     
-    fun setSearchQuery(query: String) {
+    fun loadSongs() {
+        viewModelScope.launch {
+            musicRepository.loadSongs()
+        }
+    }
+    
+    fun updateSearchQuery(query: String) {
         _searchQuery.value = query
     }
     
-    fun setSortOrder(order: SortOrder) {
-        _sortOrder.value = order
-    }
-    
-    fun playSong(song: Song) {
-        playbackManager.playSong(song)
-    }
-    
-    fun toggleFavorite(songId: Long) {
-        viewModelScope.launch {
-            favoriteRepository.toggleFavorite(songId)
-        }
-    }
-    
-    fun isFavorite(songId: Long): StateFlow<Boolean> {
-        return favoriteRepository.isFavorite(songId)
-            .stateIn(viewModelScope, SharingStarted.Lazily, false)
-    }
-    
-    enum class SortOrder {
-        TITLE, ARTIST, ALBUM, DATE_ADDED
+    fun setSortMode(mode: SortMode) {
+        _sortMode.value = mode
     }
 }
