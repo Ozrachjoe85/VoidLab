@@ -1,10 +1,10 @@
 package com.voidlab.player.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,326 +17,260 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.voidlab.player.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen() {
-    Column(
+    var audioQuality by remember { mutableStateOf("High") }
+    var enableCrossfade by remember { mutableStateOf(false) }
+    var crossfadeDuration by remember { mutableStateOf(3f) }
+    var enableNotifications by remember { mutableStateOf(true) }
+    var themeBrightness by remember { mutableStateOf(50f) }
+    
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(VoidBlack, VoidDarkGray)
+                    colors = listOf(VoidBlack, VoidBlackLight)
                 )
             )
     ) {
-        // Header
-        Surface(
-            color = VoidDarkGray,
-            modifier = Modifier.fillMaxWidth()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "SETTINGS",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Bold
+            // Header
+            Text(
+                text = "SETTINGS",
+                style = MaterialTheme.typography.headlineMedium,
+                color = VoidCyan,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Audio Settings
+            SettingsSection(title = "AUDIO") {
+                SettingsDropdown(
+                    icon = Icons.Default.HighQuality,
+                    label = "Audio Quality",
+                    value = audioQuality,
+                    options = listOf("Low", "Medium", "High", "Ultra"),
+                    onValueChange = { audioQuality = it }
                 )
-            }
-        }
-        
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Audio Section
-            item {
-                SettingsSectionHeader(title = "AUDIO")
-            }
-            
-            item {
-                SettingsItem(
-                    icon = Icons.Default.VolumeUp,
-                    title = "Audio Output",
-                    subtitle = "Default device",
-                    onClick = { }
+                
+                SettingsSwitch(
+                    icon = Icons.Default.SwapHoriz,
+                    label = "Crossfade",
+                    description = "Smooth transition between tracks",
+                    checked = enableCrossfade,
+                    onCheckedChange = { enableCrossfade = it }
                 )
-            }
-            
-            item {
-                SettingsItem(
-                    icon = Icons.Default.GraphicEq,
-                    title = "Audio Quality",
-                    subtitle = "High (320 kbps)",
-                    onClick = { }
-                )
-            }
-            
-            item {
-                var gaplessEnabled by remember { mutableStateOf(true) }
-                SettingsToggleItem(
-                    icon = Icons.Default.SkipNext,
-                    title = "Gapless Playback",
-                    subtitle = "Seamless track transitions",
-                    checked = gaplessEnabled,
-                    onCheckedChange = { gaplessEnabled = it }
-                )
-            }
-            
-            // Appearance Section
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                SettingsSectionHeader(title = "APPEARANCE")
-            }
-            
-            item {
-                var darkMode by remember { mutableStateOf(true) }
-                SettingsToggleItem(
-                    icon = Icons.Default.DarkMode,
-                    title = "Dark Mode",
-                    subtitle = "Always enabled (Void aesthetic)",
-                    checked = darkMode,
-                    onCheckedChange = { darkMode = it },
-                    enabled = false
-                )
-            }
-            
-            item {
-                SettingsItem(
-                    icon = Icons.Default.ColorLens,
-                    title = "Accent Color",
-                    subtitle = "Void Cyan (custom themes coming soon)",
-                    onClick = { }
-                )
-            }
-            
-            // Notifications Section
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                SettingsSectionHeader(title = "NOTIFICATIONS")
-            }
-            
-            item {
-                var notificationsEnabled by remember { mutableStateOf(true) }
-                SettingsToggleItem(
-                    icon = Icons.Default.Notifications,
-                    title = "Playback Notifications",
-                    subtitle = "Show lock screen controls",
-                    checked = notificationsEnabled,
-                    onCheckedChange = { notificationsEnabled = it }
-                )
-            }
-            
-            // Storage Section
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                SettingsSectionHeader(title = "STORAGE")
-            }
-            
-            item {
-                SettingsItem(
-                    icon = Icons.Default.Storage,
-                    title = "Cache Size",
-                    subtitle = "Clear album art cache",
-                    onClick = { }
-                )
-            }
-            
-            item {
-                SettingsItem(
-                    icon = Icons.Default.FolderOpen,
-                    title = "Music Folders",
-                    subtitle = "Scan custom directories",
-                    onClick = { }
-                )
-            }
-            
-            // About Section
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                SettingsSectionHeader(title = "ABOUT")
-            }
-            
-            item {
-                SettingsItem(
-                    icon = Icons.Default.Info,
-                    title = "Version",
-                    subtitle = "1.0.0 (Beta)",
-                    onClick = { }
-                )
-            }
-            
-            item {
-                SettingsItem(
-                    icon = Icons.Default.Code,
-                    title = "Open Source Licenses",
-                    subtitle = "View third-party licenses",
-                    onClick = { }
-                )
-            }
-            
-            item {
-                SettingsItem(
-                    icon = Icons.Default.BugReport,
-                    title = "Report a Bug",
-                    subtitle = "Help us improve Void Lab",
-                    onClick = { }
-                )
-            }
-            
-            // Branding
-            item {
-                Spacer(modifier = Modifier.height(32.dp))
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "VOID LAB",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = VoidCyan,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text(
-                        text = "Your Music, Perfected",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-                    
-                    Text(
-                        text = "Made with ♥ for audiophiles",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                
+                if (enableCrossfade) {
+                    SettingsSlider(
+                        label = "Crossfade Duration",
+                        value = crossfadeDuration,
+                        valueRange = 0f..10f,
+                        steps = 19,
+                        onValueChange = { crossfadeDuration = it },
+                        valueLabel = "${crossfadeDuration.toInt()}s"
                     )
                 }
             }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Appearance Settings
+            SettingsSection(title = "APPEARANCE") {
+                SettingsSlider(
+                    label = "Theme Brightness",
+                    value = themeBrightness,
+                    valueRange = 0f..100f,
+                    onValueChange = { themeBrightness = it },
+                    valueLabel = "${themeBrightness.toInt()}%"
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Notification Settings
+            SettingsSection(title = "NOTIFICATIONS") {
+                SettingsSwitch(
+                    icon = Icons.Default.Notifications,
+                    label = "Media Notifications",
+                    description = "Show playback controls in notification",
+                    checked = enableNotifications,
+                    onCheckedChange = { enableNotifications = it }
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // About Section
+            SettingsSection(title = "ABOUT") {
+                SettingsItem(
+                    icon = Icons.Default.Info,
+                    label = "Version",
+                    value = "1.0.0"
+                )
+                
+                SettingsItem(
+                    icon = Icons.Default.Copyright,
+                    label = "Build",
+                    value = "Void Lab Alpha"
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
 
 @Composable
-fun SettingsSectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.labelLarge,
-        color = VoidCyan,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(vertical = 8.dp)
-    )
+fun SettingsSection(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = VoidCyan,
+            fontWeight = FontWeight.Bold
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Surface(
+            color = VoidBlackLight,
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                content()
+            }
+        }
+    }
 }
 
 @Composable
 fun SettingsItem(
     icon: ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
+    label: String,
+    value: String
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        color = VoidGray.copy(alpha = 0.3f),
-        shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = title,
+                contentDescription = null,
                 tint = VoidCyan,
                 modifier = Modifier.size(24.dp)
             )
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium
-                )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = "Open",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = VoidCyan
             )
         }
+        
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = VoidCyan.copy(alpha = 0.6f)
+        )
     }
 }
 
 @Composable
-fun SettingsToggleItem(
+fun SettingsSwitch(
     icon: ImageVector,
-    title: String,
-    subtitle: String,
+    label: String,
+    description: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    enabled: Boolean = true
+    onCheckedChange: (Boolean) -> Unit
 ) {
-    Surface(
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        color = VoidGray.copy(alpha = 0.3f),
-        shape = RoundedCornerShape(12.dp)
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = title,
-                tint = if (enabled) VoidCyan else MaterialTheme.colorScheme.onSurfaceVariant,
+                contentDescription = null,
+                tint = VoidCyan,
                 modifier = Modifier.size(24.dp)
             )
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Medium
+                    text = label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = VoidCyan
                 )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
                 Text(
-                    text = subtitle,
+                    text = description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = VoidCyan.copy(alpha = 0.6f)
                 )
             }
-            
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-                enabled = enabled,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = VoidCyan,
-                    checkedTrackColor = VoidCyan.copy(alpha = 0.5f)
-                )
-            )
         }
+        
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = VoidCyan,
+                checkedTrackColor = VoidCyan.copy(alpha = 0.5f),
+                uncheckedThumbColor = VoidCyan.copy(alpha = 0.3f),
+                uncheckedTrackColor = VoidBlack
+            )
+        )
     }
 }
+
+@Composable
+fun SettingsDropdown(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    options: List<String>,
+    onValueChange: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = VoidCyan,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = VoidCyan
+            )
