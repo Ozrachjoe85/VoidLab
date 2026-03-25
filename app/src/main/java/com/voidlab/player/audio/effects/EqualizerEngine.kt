@@ -1,68 +1,115 @@
-package com.voidlab.player.audio.effects
+package com.voidlab.player.audio.playback
 
-import android.media.audiofx.Equalizer
-import com.voidlab.player.data.models.EQProfile
+import android.app.PendingIntent
+import android.content.Intent
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaSessionService
+import com.voidlab.player.MainActivity
+import com.voidlab.player.audio.analysis.AutoEQLearner
+import com.voidlab.player.audio.analysis.FrequencyAnalyzer
+import com.voidlab.player.audio.effects.EqualizerEngine
+import com.voidlab.player.data.repository.EQRepository
+import com.voidlab.player.data.repository.MusicRepository
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class EqualizerEngine(audioSessionId: Int) {
+@AndroidEntryPoint
+class PlaybackService : MediaSessionService() {
     
-    private val equalizer = Equalizer(0, audioSessionId)
+    @Inject
+    lateinit var eqRepository: EQRepository
     
-    init {
-        equalizer.enabled = true
-    }
+    @Inject
+    lateinit var musicRepository: MusicRepository
     
-    fun applyProfile(profile: EQProfile) {
-        val bands = profile.getBands()
-        val numberOfBands = equalizer.numberOfBands.toInt().coerceAtMost(10)
-        
-        for (i in 0 until numberOfBands) {
-            val band = i.toShort()
-            val gainMillibels = (bands.getOrNull(i) ?: 0f) * 100 // Convert dB to millibels
-            val clampedGain = gainMillibels.coerceIn(
-                equalizer.getBandLevelRange()[0].toFloat(),
-                equalizer.getBandLevelRange()[1].toFloat()
-            ).toInt().toShort()
-            
-            try {
-                equalizer.setBandLevel(band, clampedGain)
-            } catch (e: Exception) {
-                e.printStackTrace()
+    private var mediaSession: MediaSession? = null
+    private var player: ExoPlayer? = null
+    private var equalizerEngine: EqualizerEngine? = null
+    private var frequencyAnalyzer: FrequencyAnalyzer? = null
+    private var autoEQLearner: AutoEQLearner? = null
+    
+    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    
+    private val playerListener = object : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            mediaItem?.mediaId?.toLongOrNull()?.let { songId ->
+                serviceScope.launch {
+                    loadAndApplyEQProfile(songId)
+                }
             }
         }
     }
     
-    fun setBandLevel(bandIndex: Int, gainDb: Float) {
-        if (bandIndex < 0 || bandIndex >= equalizer.numberOfBands) return
+    override fun onCreate() {
+        super.onCreate()
         
-        val gainMillibels = (gainDb * 100).toInt().toShort()
-        val clampedGain = gainMillibels.coerceIn(
-            equalizer.getBandLevelRange()[0],
-            equalizer.getBandLevelRange()[1]
+        player = ExoPlayer.Builder(this).build().apply {
+            addListener(playerListener)
+        }
+        
+        player?.audioSessionId?.let { sessionId ->
+            equalizerEngine = EqualizerEngine(sessionId)
+            frequencyAnalyzer = FrequencyAnalyzer(sessionId)
+            autoEQLearner = AutoEQLearner()
+        }
+        
+        val sessionActivityIntent = Intent(this, MainActivity::class.java)
+        val sessionActivityPendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            sessionActivityIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
-        try {
-            equalizer.setBandLevel(bandIndex.toShort(), clampedGain)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        mediaSession = MediaSession.Builder(this, player!!)
+            .setSessionActivity(sessionActivityPendingIntent)
+            .build()
     }
     
-    fun getBandLevel(bandIndex: Int): Float {
-        if (bandIndex < 0 || bandIndex >= equalizer.numberOfBands) return 0f
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+        return mediaSession
+    }
+    
+    override fun onDestroy() {
+        mediaSession?.run {
+            player.release()
+            release()
+            mediaSession = null
+        }
+        equalizerEngine?.release()
+        frequencyAnalyzer?.stop()
+        player = null
+        super.onDestroy()
+    }
+    
+    private suspend fun loadAndApplyEQProfile(songId: Long) {
+        val profile = eqRepository.getProfileForSong(songId)
+        val song = musicRepository.findSongById(songId)
         
-        return try {
-            equalizer.getBandLevel(bandIndex.toShort()) / 100f // Convert millibels to dB
-        } catch (e: Exception) {
-            0f
+        if (profile != null && profile.isAutoLearned) {
+            // Apply existing learned profile
+            equalizerEngine?.applyProfile(profile)
+        } else if (song != null) {
+            // Start Auto EQ learning
+            frequencyAnalyzer?.start()
+            autoEQLearner?.startLearning(
+                analyzer = frequencyAnalyzer!!,
+                songId = songId,
+                songTitle = song.title,
+                songArtist = song.artist
+            ) { learnedProfile ->
+                serviceScope.launch {
+                    eqRepository.saveProfile(learnedProfile)
+                    equalizerEngine?.applyProfile(learnedProfile)
+                }
+            }
         }
-    }
-    
-    fun getCurrentProfile(): List<Float> {
-        val bandCount = equalizer.numberOfBands.toInt().coerceAtMost(10)
-        return (0 until bandCount).map { getBandLevel(it) }
-    }
-    
-    fun release() {
-        equalizer.release()
     }
 }
