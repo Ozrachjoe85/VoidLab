@@ -2,13 +2,15 @@ package com.voidlab.player.data.repository
 
 import android.content.ContentUris
 import android.content.Context
+import android.net.Uri
 import android.provider.MediaStore
 import com.voidlab.player.data.models.Song
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,8 +18,12 @@ import javax.inject.Singleton
 class MusicRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    fun getSongs(): Flow<List<Song>> = flow {
-        val songs = mutableListOf<Song>()
+    
+    private val _songs = MutableStateFlow<List<Song>>(emptyList())
+    val songs: Flow<List<Song>> = _songs.asStateFlow()
+    
+    suspend fun loadSongs() = withContext(Dispatchers.IO) {
+        val songList = mutableListOf<Song>()
         
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
@@ -25,10 +31,9 @@ class MusicRepository @Inject constructor(
             MediaStore.Audio.Media.ARTIST,
             MediaStore.Audio.Media.ALBUM,
             MediaStore.Audio.Media.DURATION,
+            MediaStore.Audio.Media.ALBUM_ID,
             MediaStore.Audio.Media.DATE_ADDED,
-            MediaStore.Audio.Media.TRACK,
-            MediaStore.Audio.Media.YEAR,
-            MediaStore.Audio.Media.ALBUM_ID
+            MediaStore.Audio.Media.SIZE
         )
         
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
@@ -46,21 +51,19 @@ class MusicRepository @Inject constructor(
             val artistColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
             val albumColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
             val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-            val dateAddedColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
-            val trackColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TRACK)
-            val yearColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR)
             val albumIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
+            val dateAddedColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
+            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
             
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
-                val title = cursor.getString(titleColumn) ?: "Unknown Title"
+                val title = cursor.getString(titleColumn) ?: "Unknown"
                 val artist = cursor.getString(artistColumn) ?: "Unknown Artist"
                 val album = cursor.getString(albumColumn) ?: "Unknown Album"
                 val duration = cursor.getLong(durationColumn)
-                val dateAdded = cursor.getLong(dateAddedColumn)
-                val track = cursor.getInt(trackColumn)
-                val year = cursor.getInt(yearColumn)
                 val albumId = cursor.getLong(albumIdColumn)
+                val dateAdded = cursor.getLong(dateAddedColumn)
+                val size = cursor.getLong(sizeColumn)
                 
                 val uri = ContentUris.withAppendedId(
                     MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
@@ -68,27 +71,30 @@ class MusicRepository @Inject constructor(
                 )
                 
                 val albumArtUri = ContentUris.withAppendedId(
-                    android.net.Uri.parse("content://media/external/audio/albumart"),
+                    Uri.parse("content://media/external/audio/albumart"),
                     albumId
                 )
                 
-                songs.add(
+                songList.add(
                     Song(
                         id = id,
+                        uri = uri,
                         title = title,
                         artist = artist,
                         album = album,
                         duration = duration,
-                        uri = uri,
                         albumArtUri = albumArtUri,
                         dateAdded = dateAdded,
-                        track = track,
-                        year = year
+                        size = size
                     )
                 )
             }
         }
         
-        emit(songs)
-    }.flowOn(Dispatchers.IO)
+        _songs.value = songList
+    }
+    
+    fun findSongById(id: Long): Song? {
+        return _songs.value.find { it.id == id }
+    }
 }
