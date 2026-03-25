@@ -8,22 +8,16 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.voidlab.player.MainActivity
+import com.voidlab.player.VoidLabApp
 import com.voidlab.player.audio.analysis.AutoEQLearner
 import com.voidlab.player.audio.analysis.FrequencyAnalyzer
 import com.voidlab.player.audio.effects.EqualizerEngine
-import com.voidlab.player.data.repository.EQRepository
-import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@AndroidEntryPoint
 class PlaybackService : MediaSessionService() {
-    
-    @Inject
-    lateinit var eqRepository: EQRepository
     
     private var mediaSession: MediaSession? = null
     private var player: ExoPlayer? = null
@@ -86,19 +80,29 @@ class PlaybackService : MediaSessionService() {
     }
     
     private suspend fun loadAndApplyEQProfile(songId: Long) {
-        val profile = eqRepository.getProfile(songId)
+        // Get repositories from Application
+        val app = application as VoidLabApp
+        val eqRepository = app.eqRepository
+        val musicRepository = app.musicRepository
         
-        if (profile != null && profile.isLearned) {
+        val profile = eqRepository.getProfileForSong(songId)
+        val song = musicRepository.findSongById(songId)
+        
+        if (profile != null && profile.isAutoLearned) {
             // Apply existing learned profile
             equalizerEngine?.applyProfile(profile)
-        } else {
+        } else if (song != null) {
             // Start Auto EQ learning
             frequencyAnalyzer?.start()
-            autoEQLearner?.startLearning(frequencyAnalyzer!!) { learnedProfile ->
+            autoEQLearner?.startLearning(
+                analyzer = frequencyAnalyzer!!,
+                songId = songId,
+                songTitle = song.title,
+                songArtist = song.artist
+            ) { learnedProfile ->
                 serviceScope.launch {
-                    val profileWithId = learnedProfile.copy(songId = songId)
-                    eqRepository.saveProfile(profileWithId)
-                    equalizerEngine?.applyProfile(profileWithId)
+                    eqRepository.saveProfile(learnedProfile)
+                    equalizerEngine?.applyProfile(learnedProfile)
                 }
             }
         }
