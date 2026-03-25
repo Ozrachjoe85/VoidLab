@@ -1,7 +1,6 @@
 package com.voidlab.player.audio.analysis
 
 import android.media.audiofx.Visualizer
-import com.voidlab.player.data.models.FrequencySnapshot
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,7 +10,7 @@ import kotlin.math.sqrt
 class FrequencyAnalyzer(private val audioSessionId: Int) {
     
     private var visualizer: Visualizer? = null
-    private val snapshots = mutableListOf<FrequencySnapshot>()
+    private val snapshots = mutableListOf<FloatArray>()
     
     private val _currentSpectrum = MutableStateFlow(FloatArray(10))
     val currentSpectrum: StateFlow<FloatArray> = _currentSpectrum.asStateFlow()
@@ -92,10 +91,10 @@ class FrequencyAnalyzer(private val audioSessionId: Int) {
         }
         
         _currentSpectrum.value = bands
-        snapshots.add(FrequencySnapshot(System.currentTimeMillis(), bands))
+        snapshots.add(bands.copyOf())
     }
     
-    fun getSnapshots(): List<FrequencySnapshot> = snapshots.toList()
+    fun getSnapshots(): List<FloatArray> = snapshots.toList()
     
     fun clearSnapshots() {
         snapshots.clear()
