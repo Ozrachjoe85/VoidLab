@@ -1,12 +1,10 @@
 package com.voidlab.player.audio.analysis
 
 import com.voidlab.player.data.models.EQProfile
-import com.voidlab.player.data.models.FrequencySnapshot
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlin.math.abs
 
 class AutoEQLearner {
     
@@ -25,6 +23,9 @@ class AutoEQLearner {
     
     fun startLearning(
         analyzer: FrequencyAnalyzer,
+        songId: Long,
+        songTitle: String,
+        songArtist: String,
         onComplete: (EQProfile) -> Unit
     ) {
         learningJob?.cancel()
@@ -42,7 +43,7 @@ class AutoEQLearner {
             }
             
             if (isActive) {
-                val profile = computeProfile(analyzer.getSnapshots())
+                val profile = computeProfile(songId, songTitle, songArtist, analyzer.getSnapshots())
                 _isLearning.value = false
                 _learningProgress.value = 1f
                 withContext(Dispatchers.Main) {
@@ -58,11 +59,18 @@ class AutoEQLearner {
         _learningProgress.value = 0f
     }
     
-    private fun computeProfile(snapshots: List<FrequencySnapshot>): EQProfile {
+    private fun computeProfile(
+        songId: Long,
+        songTitle: String,
+        songArtist: String,
+        snapshots: List<FloatArray>
+    ): EQProfile {
         if (snapshots.isEmpty()) {
             return EQProfile(
-                songId = 0,
-                isLearned = false
+                songId = songId,
+                songTitle = songTitle,
+                songArtist = songArtist,
+                isAutoLearned = false
             )
         }
         
@@ -71,7 +79,7 @@ class AutoEQLearner {
         val bandMedians = FloatArray(bandCount)
         
         for (bandIndex in 0 until bandCount) {
-            val bandValues = snapshots.map { it.bands[bandIndex] }.sorted()
+            val bandValues = snapshots.map { it[bandIndex] }.sorted()
             bandMedians[bandIndex] = bandValues[bandValues.size / 2]
         }
         
@@ -85,20 +93,12 @@ class AutoEQLearner {
         // Apply smoothing to avoid harsh transitions
         val smoothedAdjustments = smoothBands(adjustments)
         
-        return EQProfile(
-            songId = 0, // Will be set by caller
-            band31Hz = smoothedAdjustments[0],
-            band62Hz = smoothedAdjustments[1],
-            band125Hz = smoothedAdjustments[2],
-            band250Hz = smoothedAdjustments[3],
-            band500Hz = smoothedAdjustments[4],
-            band1kHz = smoothedAdjustments[5],
-            band2kHz = smoothedAdjustments[6],
-            band4kHz = smoothedAdjustments[7],
-            band8kHz = smoothedAdjustments[8],
-            band16kHz = smoothedAdjustments[9],
-            isLearned = true,
-            learnedAt = System.currentTimeMillis()
+        return EQProfile.fromBands(
+            songId = songId,
+            songTitle = songTitle,
+            songArtist = songArtist,
+            bands = smoothedAdjustments,
+            isAutoLearned = true
         )
     }
     
