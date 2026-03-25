@@ -1,6 +1,5 @@
 package com.voidlab.player.ui.screens
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -15,19 +14,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.voidlab.player.data.models.AutoEQState
 import com.voidlab.player.ui.theme.*
 import com.voidlab.player.ui.viewmodels.PlayerViewModel
-import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
-fun NowPlayingScreen(viewModel: PlayerViewModel) {
+fun NowPlayingScreen(
+    viewModel: PlayerViewModel
+) {
     val currentSong by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
-    val position by viewModel.position.collectAsState()
     val autoEQState by viewModel.autoEQState.collectAsState()
     val isFavorite by viewModel.isFavorite.collectAsState()
     val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsState()
@@ -38,7 +36,7 @@ fun NowPlayingScreen(viewModel: PlayerViewModel) {
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(VoidBlack, VoidDarkGray)
+                    colors = listOf(VoidBlack, VoidBlackLight)
                 )
             )
     ) {
@@ -48,74 +46,61 @@ fun NowPlayingScreen(viewModel: PlayerViewModel) {
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Auto EQ Status Badge
-            AutoEQStatusBadge(state = autoEQState)
-            
             Spacer(modifier = Modifier.height(32.dp))
             
-            // Album Art
-            AlbumArt(
-                artUri = currentSong?.albumArtUri,
-                isPlaying = isPlaying,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-            )
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            // Track Info
-            currentSong?.let { song ->
-                Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = "${song.artist} • ${song.album}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+            // Auto EQ Badge
+            if (autoEQState is AutoEQState.Learned) {
+                Surface(
+                    color = VoidCyan.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.padding(bottom = 16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GraphicEq,
+                            contentDescription = "Auto EQ",
+                            tint = VoidCyan,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "AUTO EQ ACTIVE",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = VoidCyan,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
             
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Progress Bar
-            currentSong?.let { song ->
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    LinearProgressIndicator(
-                        progress = if (song.duration > 0) position.toFloat() / song.duration else 0f,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp)),
-                        color = VoidCyan,
-                        trackColor = VoidGray
+            // Album Art
+            Surface(
+                modifier = Modifier
+                    .size(300.dp)
+                    .clip(RoundedCornerShape(16.dp)),
+                color = VoidBlackLight,
+                shadowElevation = 8.dp
+            ) {
+                if (currentSong?.albumArtUri != null) {
+                    AsyncImage(
+                        model = currentSong!!.albumArtUri,
+                        contentDescription = "Album Art",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = formatDuration(position),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = formatDuration(song.duration),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            modifier = Modifier.size(120.dp),
+                            tint = VoidCyan.copy(alpha = 0.3f)
                         )
                     }
                 }
@@ -123,35 +108,67 @@ fun NowPlayingScreen(viewModel: PlayerViewModel) {
             
             Spacer(modifier = Modifier.height(32.dp))
             
-            // Playback Controls
+            // Song Info
+            Text(
+                text = currentSong?.title ?: "No song playing",
+                style = MaterialTheme.typography.headlineMedium,
+                color = VoidCyan,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = currentSong?.artist ?: "Unknown Artist",
+                style = MaterialTheme.typography.bodyLarge,
+                color = VoidCyan.copy(alpha = 0.7f)
+            )
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            // Progress Bar (placeholder)
+            LinearProgressIndicator(
+                progress = { 0.5f },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp),
+                color = VoidCyan,
+                trackColor = VoidBlackLight,
+            )
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            // Controls
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Shuffle
                 IconButton(
-                    onClick = { viewModel.toggleShuffle() },
-                    modifier = Modifier.size(48.dp)
+                    onClick = { viewModel.toggleShuffle() }
                 ) {
                     Icon(
                         imageVector = Icons.Default.Shuffle,
                         contentDescription = "Shuffle",
-                        tint = if (isShuffleEnabled) VoidCyan else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (isShuffleEnabled) VoidCyan else VoidCyan.copy(alpha = 0.3f),
+                        modifier = Modifier.size(28.dp)
                     )
                 }
                 
+                // Previous
                 IconButton(
-                    onClick = { viewModel.skipToPrevious() },
-                    modifier = Modifier.size(64.dp)
+                    onClick = { viewModel.skipToPrevious() }
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
                         contentDescription = "Previous",
-                        tint = MaterialTheme.colorScheme.onBackground,
+                        tint = VoidCyan,
                         modifier = Modifier.size(48.dp)
                     )
                 }
                 
+                // Play/Pause
                 FloatingActionButton(
                     onClick = { viewModel.playPause() },
                     containerColor = VoidCyan,
@@ -161,134 +178,53 @@ fun NowPlayingScreen(viewModel: PlayerViewModel) {
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Pause" else "Play",
                         tint = VoidBlack,
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier.size(40.dp)
                     )
                 }
                 
+                // Next
                 IconButton(
-                    onClick = { viewModel.skipToNext() },
-                    modifier = Modifier.size(64.dp)
+                    onClick = { viewModel.skipToNext() }
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = "Next",
-                        tint = MaterialTheme.colorScheme.onBackground,
+                        tint = VoidCyan,
                         modifier = Modifier.size(48.dp)
                     )
                 }
                 
+                // Repeat
                 IconButton(
-                    onClick = { viewModel.cycleRepeatMode() },
-                    modifier = Modifier.size(48.dp)
+                    onClick = { viewModel.cycleRepeatMode() }
                 ) {
+                    val icon = when (repeatMode) {
+                        1 -> Icons.Default.Repeat // REPEAT_MODE_ALL
+                        2 -> Icons.Default.RepeatOne // REPEAT_MODE_ONE
+                        else -> Icons.Default.Repeat
+                    }
                     Icon(
-                        imageVector = when (repeatMode) {
-                            1 -> Icons.Default.Repeat
-                            2 -> Icons.Default.RepeatOne
-                            else -> Icons.Default.Repeat
-                        },
+                        imageVector = icon,
                         contentDescription = "Repeat",
-                        tint = if (repeatMode != 0) VoidCyan else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (repeatMode != 0) VoidCyan else VoidCyan.copy(alpha = 0.3f),
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
             
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
             
-            // Secondary Controls
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+            // Favorite button
+            IconButton(
+                onClick = { viewModel.toggleFavorite() }
             ) {
-                IconButton(onClick = { viewModel.toggleFavorite() }) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "Favorite",
-                        tint = if (isFavorite) VoidPink else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                
-                IconButton(onClick = { /* Share */ }) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = "Share",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "Favorite",
+                    tint = if (isFavorite) VoidPink else VoidCyan,
+                    modifier = Modifier.size(32.dp)
+                )
             }
         }
     }
-}
-
-@Composable
-fun AutoEQStatusBadge(state: AutoEQState) {
-    val (text, color) = when (state) {
-        is AutoEQState.Learning -> "AUTO EQ LEARNING ${(state.progress * 100).toInt()}%" to VoidPurple
-        is AutoEQState.Learned -> "AUTO EQ PROFILE LOADED" to VoidGreen
-        is AutoEQState.Error -> "AUTO EQ ERROR" to VoidPink
-        AutoEQState.Idle -> "AUTO EQ READY" to VoidCyan
-    }
-    
-    Surface(
-        color = color.copy(alpha = 0.2f),
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.padding(vertical = 8.dp)
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = color,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-@Composable
-fun AlbumArt(
-    artUri: android.net.Uri?,
-    isPlaying: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "album_art_pulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (isPlaying) 1.02f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scale"
-    )
-    
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(VoidPurple, VoidCyan, VoidPink)
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            AsyncImage(
-                model = artUri,
-                contentDescription = "Album Art",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-        }
-    }
-}
-
-fun formatDuration(millis: Long): String {
-    val duration = millis.milliseconds
-    val minutes = duration.inWholeMinutes
-    val seconds = duration.inWholeSeconds % 60
-    return "%d:%02d".format(minutes, seconds)
 }
