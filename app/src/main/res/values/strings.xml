@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">Void Lab</string>
+    <string name="now_playing">Now Playing</string>
+    <string name="library">Library</string>
+    <string name="equalizer">Equalizer</string>
+    <string name="visualizer">Visualizer</string>
+    <string name="settings">Settings</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="skip_next">Skip Next</string>
+    <string name="skip_previous">Skip Previous</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="repeat">Repeat</string>
+    <string name="favorite">Favorite</string>
+    <string name="share">Share</string>
+    <string name="auto_eq">Auto EQ</string>
+    <string name="manual_eq">Manual EQ</string>
+    <string name="search">Search</string>
+    <string name="sort">Sort</string>
+</resources>
