@@ -60,7 +60,7 @@ class PlayerViewModel @Inject constructor(
             
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 mediaItem?.mediaId?.toLongOrNull()?.let { songId ->
-                    _currentSong.value = musicRepository.getSongById(songId)
+                    _currentSong.value = musicRepository.findSongById(songId)
                     loadEQState(songId)
                 }
             }
@@ -135,8 +135,8 @@ class PlayerViewModel @Inject constructor(
     
     private fun loadEQState(songId: Long) {
         viewModelScope.launch {
-            val profile = eqRepository.getProfile(songId)
-            _autoEQState.value = if (profile != null && profile.isLearned) {
+            val profile = eqRepository.getProfileForSong(songId)
+            _autoEQState.value = if (profile != null && profile.isAutoLearned) {
                 AutoEQState.Learned(profile)
             } else {
                 AutoEQState.Idle
