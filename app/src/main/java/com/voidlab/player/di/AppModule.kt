@@ -27,11 +27,13 @@ object AppModule {
     }
     
     @Provides
+    @Singleton
     fun provideEQProfileDao(database: VoidLabDatabase): EQProfileDao {
         return database.eqProfileDao()
     }
     
     @Provides
+    @Singleton
     fun provideFavoriteDao(database: VoidLabDatabase): FavoriteDao {
         return database.favoriteDao()
     }
