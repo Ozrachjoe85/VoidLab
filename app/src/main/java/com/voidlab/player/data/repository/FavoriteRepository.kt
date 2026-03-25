@@ -10,24 +10,24 @@ import javax.inject.Singleton
 class FavoriteRepository @Inject constructor(
     private val favoriteDao: FavoriteDao
 ) {
-    fun getAllFavorites(): Flow<List<Favorite>> = favoriteDao.getAllFavorites()
     
-    fun isFavorite(songId: Long): Flow<Boolean> = favoriteDao.isFavorite(songId)
-    
-    suspend fun addFavorite(songId: Long) {
-        favoriteDao.insertFavorite(Favorite(songId))
+    fun getAllFavorites(): Flow<List<Favorite>> {
+        return favoriteDao.getAllFavorites()
     }
     
-    suspend fun removeFavorite(songId: Long) {
-        favoriteDao.deleteFavoriteBySongId(songId)
+    fun isFavorite(songId: Long): Flow<Boolean> {
+        return favoriteDao.isFavorite(songId)
     }
     
     suspend fun toggleFavorite(songId: Long) {
-        val existing = favoriteDao.getFavorite(songId)
-        if (existing != null) {
-            favoriteDao.deleteFavorite(existing)
+        if (favoriteDao.isFavoriteSync(songId)) {
+            favoriteDao.removeFavorite(songId)
         } else {
-            favoriteDao.insertFavorite(Favorite(songId))
+            favoriteDao.addFavorite(Favorite(songId))
         }
+    }
+    
+    suspend fun clearAllFavorites() {
+        favoriteDao.clearAllFavorites()
     }
 }
