@@ -274,3 +274,75 @@ fun SettingsDropdown(
                 style = MaterialTheme.typography.bodyMedium,
                 color = VoidCyan
             )
+        }
+        
+        Box {
+            TextButton(onClick = { expanded = true }) {
+                Text(
+                    text = value,
+                    color = VoidCyan.copy(alpha = 0.8f)
+                )
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                    tint = VoidCyan
+                )
+            }
+            
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            onValueChange(option)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SettingsSlider(
+    label: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int = 0,
+    onValueChange: (Float) -> Unit,
+    valueLabel: String
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = VoidCyan
+            )
+            Text(
+                text = valueLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = VoidCyan.copy(alpha = 0.6f)
+            )
+        }
+        
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            steps = steps,
+            colors = SliderDefaults.colors(
+                thumbColor = VoidCyan,
+                activeTrackColor = VoidCyan,
+                inactiveTrackColor = VoidBlack
+            )
+        )
+    }
+}
