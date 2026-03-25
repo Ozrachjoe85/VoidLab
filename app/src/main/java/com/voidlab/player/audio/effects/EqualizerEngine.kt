@@ -12,7 +12,7 @@ class EqualizerEngine(audioSessionId: Int) {
     }
     
     fun applyProfile(profile: EQProfile) {
-        val bands = profile.toBandList()
+        val bands = profile.getBands()
         val numberOfBands = equalizer.numberOfBands.toInt().coerceAtMost(10)
         
         for (i in 0 until numberOfBands) {
