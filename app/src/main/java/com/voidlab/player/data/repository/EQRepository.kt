@@ -10,37 +10,32 @@ import javax.inject.Singleton
 class EQRepository @Inject constructor(
     private val eqProfileDao: EQProfileDao
 ) {
-    fun getAllProfiles(): Flow<List<EQProfile>> = eqProfileDao.getAllProfiles()
     
-    suspend fun getProfileBySongId(songId: Long): EQProfile? {
+    suspend fun getProfileForSong(songId: Long): EQProfile? {
         return eqProfileDao.getProfileBySongId(songId)
     }
     
-    fun getProfileBySongIdFlow(songId: Long): Flow<EQProfile?> {
+    fun getProfileForSongFlow(songId: Long): Flow<EQProfile?> {
         return eqProfileDao.getProfileBySongIdFlow(songId)
+    }
+    
+    fun getAllLearnedProfiles(): Flow<List<EQProfile>> {
+        return eqProfileDao.getAllLearnedProfiles()
     }
     
     suspend fun saveProfile(profile: EQProfile) {
         eqProfileDao.insertProfile(profile)
     }
     
-    suspend fun updateProfile(profile: EQProfile) {
-        eqProfileDao.updateProfile(profile.copy(updatedAt = System.currentTimeMillis()))
-    }
-    
     suspend fun deleteProfile(profile: EQProfile) {
         eqProfileDao.deleteProfile(profile)
     }
     
-    suspend fun deleteAllProfiles() {
+    suspend fun clearAllProfiles() {
         eqProfileDao.deleteAllProfiles()
     }
     
-    suspend fun getProfileCount(): Int {
-        return eqProfileDao.getProfileCount()
-    }
-    
-    fun getLearningProfiles(): Flow<List<EQProfile>> {
-        return eqProfileDao.getLearningProfiles()
+    fun getLearnedProfileCount(): Flow<Int> {
+        return eqProfileDao.getLearnedProfileCount()
     }
 }
