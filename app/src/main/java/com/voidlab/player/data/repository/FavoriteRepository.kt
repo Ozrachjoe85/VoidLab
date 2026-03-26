@@ -1,6 +1,6 @@
 package com.voidlab.player.data.repository
 
-import com.voidlab.player.data.database.VoidLabDatabase
+import com.voidlab.player.data.database.FavoriteDao
 import com.voidlab.player.data.models.Favorite
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -11,10 +11,8 @@ import javax.inject.Singleton
 
 @Singleton
 class FavoriteRepository @Inject constructor(
-    private val database: VoidLabDatabase
+    private val dao: FavoriteDao
 ) {
-    
-    private val dao = database.favoriteDao()
     
     suspend fun toggleFavorite(songId: Long) = withContext(Dispatchers.IO) {
         val isFav = dao.isFavoriteSync(songId)
