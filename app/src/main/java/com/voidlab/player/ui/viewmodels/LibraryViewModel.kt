@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.voidlab.player.data.models.Song
 import com.voidlab.player.data.repository.MusicRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -18,51 +20,56 @@ class LibraryViewModel @Inject constructor(
     private val musicRepository: MusicRepository
 ) : ViewModel() {
     
+    private val _songs = MutableStateFlow<List<Song>>(emptyList())
+    val songs: StateFlow<List<Song>> = _songs.asStateFlow()
+    
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
     
     private val _sortMode = MutableStateFlow(SortMode.TITLE)
     val sortMode: StateFlow<SortMode> = _sortMode.asStateFlow()
     
-    val songs: StateFlow<List<Song>> = combine(
-        musicRepository.songs,
-        searchQuery,
-        sortMode
-    ) { songs, query, sort ->
-        val filtered = if (query.isBlank()) {
-            songs
-        } else {
-            songs.filter { song ->
-                song.title.contains(query, ignoreCase = true) ||
-                song.artist.contains(query, ignoreCase = true) ||
-                song.album.contains(query, ignoreCase = true)
-            }
-        }
-        
-        when (sort) {
-            SortMode.TITLE -> filtered.sortedBy { it.title.lowercase() }
-            SortMode.ARTIST -> filtered.sortedBy { it.artist.lowercase() }
-            SortMode.ALBUM -> filtered.sortedBy { it.album.lowercase() }
-            SortMode.DATE_ADDED -> filtered.sortedByDescending { it.dateAdded }
-            SortMode.DURATION -> filtered.sortedByDescending { it.duration }
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    
     init {
         loadSongs()
     }
     
-    fun loadSongs() {
+    private fun loadSongs() {
         viewModelScope.launch {
-            musicRepository.loadSongs()
+            musicRepository.getAllSongs().collect { songList ->
+                _songs.value = applySortAndFilter(songList)
+            }
         }
     }
     
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
+        loadSongs()
     }
     
     fun setSortMode(mode: SortMode) {
         _sortMode.value = mode
+        loadSongs()
+    }
+    
+    private fun applySortAndFilter(songList: List<Song>): List<Song> {
+        var filtered = songList
+        
+        // Apply search filter
+        if (_searchQuery.value.isNotEmpty()) {
+            filtered = filtered.filter { song ->
+                song.title.contains(_searchQuery.value, ignoreCase = true) ||
+                song.artist.contains(_searchQuery.value, ignoreCase = true) ||
+                song.album.contains(_searchQuery.value, ignoreCase = true)
+            }
+        }
+        
+        // Apply sorting
+        return when (_sortMode.value) {
+            SortMode.TITLE -> filtered.sortedBy { it.title }
+            SortMode.ARTIST -> filtered.sortedBy { it.artist }
+            SortMode.ALBUM -> filtered.sortedBy { it.album }
+            SortMode.DATE_ADDED -> filtered.sortedByDescending { it.dateAdded }
+            SortMode.DURATION -> filtered.sortedByDescending { it.duration }
+        }
     }
 }
