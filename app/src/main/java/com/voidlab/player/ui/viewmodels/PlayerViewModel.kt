@@ -32,11 +32,25 @@ class PlayerViewModel @Inject constructor(
     private val _isFavorite = MutableStateFlow(false)
     val isFavorite: StateFlow<Boolean> = _isFavorite.asStateFlow()
     
+    private val _isShuffleEnabled = MutableStateFlow(false)
+    val isShuffleEnabled: StateFlow<Boolean> = _isShuffleEnabled.asStateFlow()
+    
+    private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
+    val repeatMode: StateFlow<Int> = _repeatMode.asStateFlow()
+    
     private var mediaController: MediaController? = null
     
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _isPlaying.value = isPlaying
+        }
+        
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            _isShuffleEnabled.value = shuffleModeEnabled
+        }
+        
+        override fun onRepeatModeChanged(repeatMode: Int) {
+            _repeatMode.value = repeatMode
         }
     }
     
@@ -45,6 +59,8 @@ class PlayerViewModel @Inject constructor(
         mediaController = controller
         mediaController?.addListener(playerListener)
         _isPlaying.value = controller.isPlaying
+        _isShuffleEnabled.value = controller.shuffleModeEnabled
+        _repeatMode.value = controller.repeatMode
     }
     
     fun playSong(song: Song) {
@@ -82,19 +98,30 @@ class PlayerViewModel @Inject constructor(
         mediaController?.seekToPrevious()
     }
     
+    fun toggleShuffle() {
+        mediaController?.shuffleModeEnabled = !(_isShuffleEnabled.value)
+    }
+    
+    fun cycleRepeatMode() {
+        val newMode = when (_repeatMode.value) {
+            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+            else -> Player.REPEAT_MODE_OFF
+        }
+        mediaController?.repeatMode = newMode
+    }
+    
     fun toggleFavorite() {
         val song = _currentSong.value ?: return
         viewModelScope.launch {
             favoriteRepository.toggleFavorite(song.id)
-            val isFav = favoriteRepository.isFavorite(song.id)
-            _isFavorite.value = isFav
+            checkIfFavorite(song.id)
         }
     }
     
     private fun checkIfFavorite(songId: Long) {
         viewModelScope.launch {
-            val isFav = favoriteRepository.isFavorite(songId)
-            _isFavorite.value = isFav
+            _isFavorite.value = favoriteRepository.isFavorite(songId)
         }
     }
     
