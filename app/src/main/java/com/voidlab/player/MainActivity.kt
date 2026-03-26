@@ -9,12 +9,12 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
@@ -28,9 +28,11 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     
-    private val playerViewModel: PlayerViewModel by viewModels()
     private var mediaController: MediaController? = null
     private lateinit var controllerFuture: ListenableFuture<MediaController>
+    
+    // REMOVED: private val playerViewModel by viewModels()
+    // We'll get it from the composable instead
     
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -56,6 +58,14 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+                    // Get PlayerViewModel here and pass mediaController via callback
+                    val playerViewModel: PlayerViewModel = hiltViewModel()
+                    
+                    // Set the MediaController when it's ready
+                    if (mediaController != null) {
+                        playerViewModel.setMediaController(mediaController!!)
+                    }
+                    
                     VoidLabNavHost()
                 }
             }
@@ -97,8 +107,21 @@ class MainActivity : ComponentActivity() {
             try {
                 mediaController = controllerFuture.get()
                 Log.d("MainActivity", "MediaController connected successfully!")
-                playerViewModel.setMediaController(mediaController!!)
-                Log.d("MainActivity", "MediaController set in PlayerViewModel")
+                Log.d("MainActivity", "Call setContent again to trigger recomposition with MediaController")
+                // Trigger recomposition
+                setContent {
+                    VoidLabTheme {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.background
+                        ) {
+                            val playerViewModel: PlayerViewModel = hiltViewModel()
+                            Log.d("MainActivity", "Setting MediaController on PlayerViewModel instance: ${playerViewModel.hashCode()}")
+                            playerViewModel.setMediaController(mediaController!!)
+                            VoidLabNavHost()
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Failed to connect MediaController", e)
             }
@@ -117,7 +140,9 @@ class MainActivity : ComponentActivity() {
     
     override fun onDestroy() {
         Log.d("MainActivity", "onDestroy - releasing MediaController")
-        MediaController.releaseFuture(controllerFuture)
+        if (::controllerFuture.isInitialized) {
+            MediaController.releaseFuture(controllerFuture)
+        }
         super.onDestroy()
     }
 }
