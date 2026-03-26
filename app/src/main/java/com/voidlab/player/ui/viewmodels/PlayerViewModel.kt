@@ -10,6 +10,7 @@ import com.voidlab.player.data.models.AutoEQState
 import com.voidlab.player.data.models.Song
 import com.voidlab.player.data.repository.FavoriteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +27,12 @@ class PlayerViewModel @Inject constructor(
     
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+    
+    private val _currentPosition = MutableStateFlow(0L)
+    val currentPosition: StateFlow<Long> = _currentPosition.asStateFlow()
+    
+    private val _duration = MutableStateFlow(0L)
+    val duration: StateFlow<Long> = _duration.asStateFlow()
     
     private val _autoEQState = MutableStateFlow<AutoEQState>(AutoEQState.Idle)
     val autoEQState: StateFlow<AutoEQState> = _autoEQState.asStateFlow()
@@ -45,6 +52,9 @@ class PlayerViewModel @Inject constructor(
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             Log.d("PlayerViewModel", "Player onIsPlayingChanged: $isPlaying")
             _isPlaying.value = isPlaying
+            if (isPlaying) {
+                startProgressTracking()
+            }
         }
         
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
@@ -53,6 +63,32 @@ class PlayerViewModel @Inject constructor(
         
         override fun onRepeatModeChanged(repeatMode: Int) {
             _repeatMode.value = repeatMode
+        }
+        
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            // Update duration when song changes
+            mediaController?.let {
+                _duration.value = it.duration
+            }
+        }
+    }
+    
+    init {
+        // Start progress tracking loop
+        startProgressTracking()
+    }
+    
+    private fun startProgressTracking() {
+        viewModelScope.launch {
+            while (true) {
+                mediaController?.let { controller ->
+                    if (controller.isPlaying) {
+                        _currentPosition.value = controller.currentPosition
+                        _duration.value = controller.duration
+                    }
+                }
+                delay(100) // Update every 100ms for smooth progress
+            }
         }
     }
     
@@ -96,6 +132,9 @@ class PlayerViewModel @Inject constructor(
             Log.d("PlayerViewModel", "Play command sent")
             Log.d("PlayerViewModel", "MediaController.isPlaying: $isPlaying")
             Log.d("PlayerViewModel", "MediaController.playbackState: $playbackState")
+            
+            // Update duration
+            _duration.value = duration
         } ?: run {
             Log.e("PlayerViewModel", "ERROR: MediaController is NULL! Cannot play song")
             Log.e("PlayerViewModel", "This instance (${this.hashCode()}) doesn't have MediaController")
@@ -127,6 +166,10 @@ class PlayerViewModel @Inject constructor(
     fun skipToPrevious() {
         Log.d("PlayerViewModel", "skipToPrevious called")
         mediaController?.seekToPrevious()
+    }
+    
+    fun seekTo(position: Long) {
+        mediaController?.seekTo(position)
     }
     
     fun toggleShuffle() {
