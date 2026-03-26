@@ -46,6 +46,11 @@ class LibraryViewModel @Inject constructor(
         loadSongs()
     }
     
+    // ADDED: Alias for LibraryScreen compatibility
+    fun setSearchQuery(query: String) {
+        updateSearchQuery(query)
+    }
+    
     fun setSortMode(mode: SortMode) {
         _sortMode.value = mode
         loadSongs()
