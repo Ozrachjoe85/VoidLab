@@ -86,13 +86,15 @@ class PlayerViewModel @Inject constructor(
         val song = _currentSong.value ?: return
         viewModelScope.launch {
             favoriteRepository.toggleFavorite(song.id)
-            checkIfFavorite(song.id)
+            val isFav = favoriteRepository.isFavorite(song.id)
+            _isFavorite.value = isFav
         }
     }
     
     private fun checkIfFavorite(songId: Long) {
         viewModelScope.launch {
-            _isFavorite.value = favoriteRepository.isFavorite(songId)
+            val isFav = favoriteRepository.isFavorite(songId)
+            _isFavorite.value = isFav
         }
     }
     
