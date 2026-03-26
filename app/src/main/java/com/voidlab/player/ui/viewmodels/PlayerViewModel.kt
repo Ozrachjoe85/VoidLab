@@ -121,7 +121,9 @@ class PlayerViewModel @Inject constructor(
     
     private fun checkIfFavorite(songId: Long) {
         viewModelScope.launch {
-            _isFavorite.value = favoriteRepository.isFavorite(songId)
+            favoriteRepository.isFavorite(songId).collect { isFav ->
+    _isFavorite.value = isFav
+            }
         }
     }
     
