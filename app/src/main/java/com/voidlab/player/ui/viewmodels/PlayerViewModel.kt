@@ -46,6 +46,12 @@ class PlayerViewModel @Inject constructor(
     private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
     val repeatMode: StateFlow<Int> = _repeatMode.asStateFlow()
     
+    // PLAYLIST/QUEUE MANAGEMENT
+    private val _playlist = MutableStateFlow<List<Song>>(emptyList())
+    val playlist: StateFlow<List<Song>> = _playlist.asStateFlow()
+    
+    private var currentIndex = 0
+    
     private var mediaController: MediaController? = null
     
     private val playerListener = object : Player.Listener {
@@ -66,7 +72,18 @@ class PlayerViewModel @Inject constructor(
         }
         
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            // Update duration when song changes
+            Log.d("PlayerViewModel", "Media item transition: ${mediaItem?.mediaId}")
+            // Update current song when track changes
+            mediaItem?.mediaId?.toLongOrNull()?.let { songId ->
+                val song = _playlist.value.find { it.id == songId }
+                if (song != null) {
+                    _currentSong.value = song
+                    currentIndex = _playlist.value.indexOf(song)
+                    checkIfFavorite(songId)
+                }
+            }
+            
+            // Update duration
             mediaController?.let {
                 _duration.value = it.duration
             }
@@ -106,43 +123,60 @@ class PlayerViewModel @Inject constructor(
         Log.d("PlayerViewModel", "========================================")
     }
     
-    fun playSong(song: Song) {
+    /**
+     * Play a full playlist/queue starting at a specific index.
+     * This enables Next/Previous navigation and auto-advance.
+     */
+    fun playPlaylist(songs: List<Song>, startIndex: Int = 0) {
         Log.d("PlayerViewModel", "========================================")
-        Log.d("PlayerViewModel", "playSong called on instance: ${this.hashCode()}")
-        Log.d("PlayerViewModel", "Song: ${song.title}")
-        Log.d("PlayerViewModel", "Song URI: ${song.uri}")
-        Log.d("PlayerViewModel", "MediaController is null: ${mediaController == null}")
+        Log.d("PlayerViewModel", "playPlaylist called with ${songs.size} songs, startIndex=$startIndex")
         
-        _currentSong.value = song
+        if (songs.isEmpty()) {
+            Log.e("PlayerViewModel", "Empty playlist!")
+            return
+        }
         
-        val mediaItem = MediaItem.Builder()
-            .setMediaId(song.id.toString())
-            .setUri(song.uri)
-            .build()
+        _playlist.value = songs
+        currentIndex = startIndex.coerceIn(0, songs.size - 1)
+        _currentSong.value = songs[currentIndex]
         
-        Log.d("PlayerViewModel", "MediaItem created with URI: ${song.uri}")
+        // Build MediaItem list for ExoPlayer
+        val mediaItems = songs.map { song ->
+            MediaItem.Builder()
+                .setMediaId(song.id.toString())
+                .setUri(song.uri)
+                .build()
+        }
+        
+        Log.d("PlayerViewModel", "Built ${mediaItems.size} MediaItems")
         
         mediaController?.apply {
-            Log.d("PlayerViewModel", "MediaController exists, setting media item")
-            setMediaItem(mediaItem)
-            Log.d("PlayerViewModel", "Calling prepare()")
+            Log.d("PlayerViewModel", "Setting media items and starting playback")
+            setMediaItems(mediaItems, currentIndex, 0)
             prepare()
-            Log.d("PlayerViewModel", "Calling play()")
             play()
-            Log.d("PlayerViewModel", "Play command sent")
-            Log.d("PlayerViewModel", "MediaController.isPlaying: $isPlaying")
-            Log.d("PlayerViewModel", "MediaController.playbackState: $playbackState")
             
             // Update duration
             _duration.value = duration
+            
+            Log.d("PlayerViewModel", "Playback started!")
+            Log.d("PlayerViewModel", "MediaController.isPlaying: $isPlaying")
+            Log.d("PlayerViewModel", "MediaController.playbackState: $playbackState")
         } ?: run {
-            Log.e("PlayerViewModel", "ERROR: MediaController is NULL! Cannot play song")
-            Log.e("PlayerViewModel", "This instance (${this.hashCode()}) doesn't have MediaController")
+            Log.e("PlayerViewModel", "ERROR: MediaController is NULL!")
         }
         
         Log.d("PlayerViewModel", "========================================")
         
-        checkIfFavorite(song.id)
+        checkIfFavorite(songs[currentIndex].id)
+    }
+    
+    /**
+     * Play a single song (creates a 1-song playlist).
+     * Use playPlaylist() for better queue management.
+     */
+    fun playSong(song: Song) {
+        playPlaylist(listOf(song), 0)
     }
     
     fun playPause() {
@@ -159,13 +193,29 @@ class PlayerViewModel @Inject constructor(
     }
     
     fun skipToNext() {
-        Log.d("PlayerViewModel", "skipToNext called")
-        mediaController?.seekToNext()
+        Log.d("PlayerViewModel", "skipToNext called, currentIndex=$currentIndex, playlistSize=${_playlist.value.size}")
+        
+        mediaController?.apply {
+            if (hasNextMediaItem()) {
+                seekToNext()
+                Log.d("PlayerViewModel", "Skipped to next track")
+            } else {
+                Log.d("PlayerViewModel", "No next track available")
+            }
+        } ?: Log.e("PlayerViewModel", "MediaController is null in skipToNext()")
     }
     
     fun skipToPrevious() {
         Log.d("PlayerViewModel", "skipToPrevious called")
-        mediaController?.seekToPrevious()
+        
+        mediaController?.apply {
+            if (hasPreviousMediaItem()) {
+                seekToPrevious()
+                Log.d("PlayerViewModel", "Skipped to previous track")
+            } else {
+                Log.d("PlayerViewModel", "No previous track available")
+            }
+        } ?: Log.e("PlayerViewModel", "MediaController is null in skipToPrevious()")
     }
     
     fun seekTo(position: Long) {
