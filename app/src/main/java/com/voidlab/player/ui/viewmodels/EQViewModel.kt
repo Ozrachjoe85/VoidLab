@@ -123,7 +123,7 @@ class EQViewModel @Inject constructor(
     
     fun deleteProfile(profile: EQProfile) {
         viewModelScope.launch {
-            eqRepository.deleteProfile(profile.songId)
+            eqRepository.deleteProfile(profile)
             loadLearnedProfiles()
         }
     }
