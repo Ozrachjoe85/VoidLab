@@ -57,19 +57,23 @@ class PlayerViewModel @Inject constructor(
     }
     
     fun setMediaController(controller: MediaController) {
-        Log.d("PlayerViewModel", "setMediaController called")
+        Log.d("PlayerViewModel", "========================================")
+        Log.d("PlayerViewModel", "setMediaController called on instance: ${this.hashCode()}")
         mediaController?.removeListener(playerListener)
         mediaController = controller
         mediaController?.addListener(playerListener)
         _isPlaying.value = controller.isPlaying
         _isShuffleEnabled.value = controller.shuffleModeEnabled
         _repeatMode.value = controller.repeatMode
-        Log.d("PlayerViewModel", "MediaController set successfully, isPlaying: ${controller.isPlaying}")
+        Log.d("PlayerViewModel", "MediaController set successfully!")
+        Log.d("PlayerViewModel", "MediaController.isPlaying: ${controller.isPlaying}")
+        Log.d("PlayerViewModel", "========================================")
     }
     
     fun playSong(song: Song) {
         Log.d("PlayerViewModel", "========================================")
-        Log.d("PlayerViewModel", "playSong called for: ${song.title}")
+        Log.d("PlayerViewModel", "playSong called on instance: ${this.hashCode()}")
+        Log.d("PlayerViewModel", "Song: ${song.title}")
         Log.d("PlayerViewModel", "Song URI: ${song.uri}")
         Log.d("PlayerViewModel", "MediaController is null: ${mediaController == null}")
         
@@ -94,7 +98,7 @@ class PlayerViewModel @Inject constructor(
             Log.d("PlayerViewModel", "MediaController.playbackState: $playbackState")
         } ?: run {
             Log.e("PlayerViewModel", "ERROR: MediaController is NULL! Cannot play song")
-            Log.e("PlayerViewModel", "This means MainActivity didn't call setMediaController()")
+            Log.e("PlayerViewModel", "This instance (${this.hashCode()}) doesn't have MediaController")
         }
         
         Log.d("PlayerViewModel", "========================================")
@@ -156,7 +160,7 @@ class PlayerViewModel @Inject constructor(
     
     override fun onCleared() {
         super.onCleared()
-        Log.d("PlayerViewModel", "onCleared - removing listener")
+        Log.d("PlayerViewModel", "onCleared (instance ${this.hashCode()}) - removing listener")
         mediaController?.removeListener(playerListener)
     }
 }
