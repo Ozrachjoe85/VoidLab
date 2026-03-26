@@ -7,6 +7,8 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import com.voidlab.player.MainActivity
 import com.voidlab.player.VoidLabApp
 import com.voidlab.player.audio.analysis.AutoEQLearner
@@ -58,8 +60,24 @@ class PlaybackService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
+        // Build MediaSession with proper callback for notification controls
         mediaSession = MediaSession.Builder(this, player!!)
             .setSessionActivity(sessionActivityPendingIntent)
+            .setCallback(object : MediaSession.Callback {
+                override fun onAddMediaItems(
+                    mediaSession: MediaSession,
+                    controller: MediaSession.ControllerInfo,
+                    mediaItems: List<MediaItem>
+                ): ListenableFuture<List<MediaItem>> {
+                    // This callback is required for proper notification handling
+                    val updatedMediaItems = mediaItems.map { mediaItem ->
+                        mediaItem.buildUpon()
+                            .setUri(mediaItem.requestMetadata.mediaUri ?: mediaItem.localConfiguration?.uri)
+                            .build()
+                    }
+                    return Futures.immediateFuture(updatedMediaItems)
+                }
+            })
             .build()
     }
     
