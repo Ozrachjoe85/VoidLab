@@ -1,6 +1,5 @@
 package com.voidlab.player.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,12 +12,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.voidlab.player.R
 import com.voidlab.player.data.models.Song
 import com.voidlab.player.ui.theme.*
 import com.voidlab.player.ui.viewmodels.LibraryViewModel
@@ -28,172 +28,142 @@ import com.voidlab.player.ui.viewmodels.SortMode
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
-    playerViewModel: PlayerViewModel = hiltViewModel(),
-    libraryViewModel: LibraryViewModel = hiltViewModel()
+    playerViewModel: PlayerViewModel,
+    libraryViewModel: LibraryViewModel
 ) {
     val songs by libraryViewModel.songs.collectAsState()
     val searchQuery by libraryViewModel.searchQuery.collectAsState()
     val sortMode by libraryViewModel.sortMode.collectAsState()
-    var showSortMenu by remember { mutableStateOf(false) }
     
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(VoidBlack, VoidBlackLight)
-                )
-            )
+            .padding(16.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
+        // Header
+        Text(
+            text = "LIBRARY",
+            style = MaterialTheme.typography.headlineMedium,
+            color = VoidCyan,
+            fontWeight = FontWeight.Bold
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Search bar
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { libraryViewModel.setSearchQuery(it) },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Search songs...") },
+            leadingIcon = {
+                Icon(Icons.Default.Search, contentDescription = "Search")
+            },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { libraryViewModel.setSearchQuery("") }) {
+                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+                    }
+                }
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = VoidCyan,
+                unfocusedBorderColor = VoidCyan.copy(alpha = 0.5f),
+                focusedTextColor = VoidCyan,
+                unfocusedTextColor = VoidCyan
+            ),
+            singleLine = true
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Sort options
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Top Bar with Search
-            Surface(
-                color = VoidBlackLight,
-                shadowElevation = 4.dp
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "LIBRARY",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = VoidCyan,
-                        fontWeight = FontWeight.Bold
+            SortMode.entries.take(3).forEach { mode ->
+                FilterChip(
+                    selected = sortMode == mode,
+                    onClick = { libraryViewModel.setSortMode(mode) },
+                    label = { Text(mode.name) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = VoidCyan,
+                        selectedLabelColor = VoidBlack
                     )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextField(
-                            value = searchQuery,
-                            onValueChange = { libraryViewModel.updateSearchQuery(it) },
-                            placeholder = {
-                                Text("Search songs...", color = VoidCyan.copy(alpha = 0.5f))
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Search,
-                                    contentDescription = "Search",
-                                    tint = VoidCyan
-                                )
-                            },
-                            trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { libraryViewModel.updateSearchQuery("") }) {
-                                        Icon(
-                                            Icons.Default.Close,
-                                            contentDescription = "Clear",
-                                            tint = VoidCyan
-                                        )
-                                    }
-                                }
-                            },
-                            colors = TextFieldDefaults.colors(
-                                focusedTextColor = VoidCyan,
-                                unfocusedTextColor = VoidCyan,
-                                focusedContainerColor = VoidBlack,
-                                unfocusedContainerColor = VoidBlack,
-                                focusedIndicatorColor = VoidCyan,
-                                unfocusedIndicatorColor = VoidCyan.copy(alpha = 0.3f),
-                                cursorColor = VoidCyan
-                            ),
-                            modifier = Modifier.weight(1f)
-                        )
-                        
-                        Spacer(modifier = Modifier.width(8.dp))
-                        
-                        Box {
-                            IconButton(onClick = { showSortMenu = true }) {
-                                Icon(
-                                    Icons.Default.Sort,
-                                    contentDescription = "Sort",
-                                    tint = VoidCyan
-                                )
-                            }
-                            
-                            DropdownMenu(
-                                expanded = showSortMenu,
-                                onDismissRequest = { showSortMenu = false }
-                            ) {
-                                SortMode.entries.forEach { mode ->
-                                    DropdownMenuItem(
-                                        text = { Text(mode.name.replace('_', ' ')) },
-                                        onClick = {
-                                            libraryViewModel.setSortMode(mode)
-                                            showSortMenu = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                )
             }
-            
-            // Song List
-            if (songs.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MusicNote,
-                            contentDescription = null,
-                            modifier = Modifier.size(80.dp),
-                            tint = VoidCyan.copy(alpha = 0.3f)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "No songs found",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = VoidCyan.copy(alpha = 0.5f)
-                        )
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            SortMode.entries.drop(3).forEach { mode ->
+                FilterChip(
+                    selected = sortMode == mode,
+                    onClick = { libraryViewModel.setSortMode(mode) },
+                    label = { Text(mode.name) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = VoidCyan,
+                        selectedLabelColor = VoidBlack
+                    )
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Song count
+        Text(
+            text = "${songs.size} songs",
+            style = MaterialTheme.typography.bodyMedium,
+            color = VoidCyan.copy(alpha = 0.7f)
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        // Songs list
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(songs, key = { it.id }) { song ->
+                SongItem(
+                    song = song,
+                    onClick = {
+                        // CRITICAL: Pass the ENTIRE song list as a playlist!
+                        val allSongs = songs
+                        val clickedIndex = allSongs.indexOf(song)
+                        playerViewModel.playPlaylist(allSongs, clickedIndex)
                     }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(songs, key = { it.id }) { song ->
-                        SongListItem(
-                            song = song,
-                            onClick = { playerViewModel.playSong(song) }
-                        )
-                    }
-                }
+                )
             }
         }
     }
 }
 
 @Composable
-fun SongListItem(
+fun SongItem(
     song: Song,
     onClick: () -> Unit
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick),
         color = VoidBlackLight,
-        shadowElevation = 2.dp
+        shape = RoundedCornerShape(8.dp)
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier
+                .padding(12.dp)
+                .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Album Art
+            // Album art thumbnail
             Surface(
                 modifier = Modifier
                     .size(56.dp)
@@ -202,7 +172,12 @@ fun SongListItem(
             ) {
                 if (song.albumArtUri != null) {
                     AsyncImage(
-                        model = song.albumArtUri,
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(song.albumArtUri)
+                            .crossfade(true)
+                            .error(R.drawable.ic_launcher_foreground)
+                            .placeholder(R.drawable.ic_launcher_foreground)
+                            .build(),
                         contentDescription = "Album Art",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -215,7 +190,8 @@ fun SongListItem(
                         Icon(
                             imageVector = Icons.Default.MusicNote,
                             contentDescription = null,
-                            tint = VoidCyan.copy(alpha = 0.3f)
+                            tint = VoidCyan.copy(alpha = 0.3f),
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                 }
@@ -223,7 +199,7 @@ fun SongListItem(
             
             Spacer(modifier = Modifier.width(12.dp))
             
-            // Song Info
+            // Song info
             Column(
                 modifier = Modifier.weight(1f)
             ) {
@@ -231,15 +207,19 @@ fun SongListItem(
                     text = song.title,
                     style = MaterialTheme.typography.bodyLarge,
                     color = VoidCyan,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "${song.artist} • ${song.album}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = VoidCyan.copy(alpha = 0.6f)
+                    color = VoidCyan.copy(alpha = 0.6f),
+                    maxLines = 1
                 )
             }
+            
+            Spacer(modifier = Modifier.width(8.dp))
             
             // Duration
             Text(
@@ -251,8 +231,9 @@ fun SongListItem(
     }
 }
 
-fun formatDuration(millis: Long): String {
-    val seconds = (millis / 1000) % 60
-    val minutes = (millis / (1000 * 60)) % 60
-    return String.format("%d:%02d", minutes, seconds)
+private fun formatDuration(millis: Long): String {
+    val totalSeconds = (millis / 1000).toInt()
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "$minutes:${seconds.toString().padStart(2, '0')}"
 }
