@@ -2,7 +2,6 @@ package com.voidlab.player.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -30,6 +29,10 @@ fun NowPlayingScreen(
     val isFavorite by viewModel.isFavorite.collectAsState()
     val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsState()
     val repeatMode by viewModel.repeatMode.collectAsState()
+    
+    // PROGRESS TRACKING
+    val currentPosition by viewModel.currentPosition.collectAsState()
+    val duration by viewModel.duration.collectAsState()
     
     Box(
         modifier = Modifier
@@ -126,15 +129,44 @@ fun NowPlayingScreen(
             
             Spacer(modifier = Modifier.height(32.dp))
             
-            // Progress Bar (placeholder)
-            LinearProgressIndicator(
-                progress = { 0.5f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp),
-                color = VoidCyan,
-                trackColor = VoidBlackLight,
-            )
+            // WORKING PROGRESS BAR
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Progress slider
+                var tempPosition by remember { mutableStateOf<Long?>(null) }
+                
+                Slider(
+                    value = (tempPosition ?: currentPosition).toFloat(),
+                    onValueChange = { tempPosition = it.toLong() },
+                    onValueChangeFinished = {
+                        tempPosition?.let { viewModel.seekTo(it) }
+                        tempPosition = null
+                    },
+                    valueRange = 0f..(duration.coerceAtLeast(1)).toFloat(),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = SliderDefaults.colors(
+                        thumbColor = VoidCyan,
+                        activeTrackColor = VoidCyan,
+                        inactiveTrackColor = VoidBlackLight
+                    )
+                )
+                
+                // Time labels
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = formatTime(currentPosition),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = VoidCyan.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = formatTime(duration),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = VoidCyan.copy(alpha = 0.7f)
+                    )
+                }
+            }
             
             Spacer(modifier = Modifier.height(32.dp))
             
@@ -227,4 +259,13 @@ fun NowPlayingScreen(
             }
         }
     }
+}
+
+// Helper function to format time in mm:ss
+private fun formatTime(millis: Long): String {
+    if (millis < 0) return "0:00"
+    val totalSeconds = (millis / 1000).toInt()
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "$minutes:${seconds.toString().padStart(2, '0')}"
 }
