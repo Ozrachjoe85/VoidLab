@@ -2,6 +2,7 @@ package com.voidlab.player.ui.screens
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,14 +14,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import coil.compose.rememberAsyncImagePainter
 import com.voidlab.player.ui.theme.*
+import com.voidlab.player.ui.viewmodels.PlayerViewModel
 import kotlin.math.*
 import kotlin.random.Random
 
@@ -29,9 +32,14 @@ enum class VisualizerMode {
 }
 
 @Composable
-fun VisualizerScreen() {
+fun VisualizerScreen(
+    playerViewModel: PlayerViewModel
+) {
     var currentMode by remember { mutableStateOf(VisualizerMode.SPECTRUM) }
     var isFullscreen by remember { mutableStateOf(false) }
+    
+    // Get current song for album art morphing
+    val currentSong by playerViewModel.currentSong.collectAsState()
     
     Box(
         modifier = Modifier
@@ -48,7 +56,6 @@ fun VisualizerScreen() {
                 .padding(16.dp)
         ) {
             if (!isFullscreen) {
-                // Header
                 Text(
                     text = "VISUALIZER",
                     style = MaterialTheme.typography.headlineMedium,
@@ -58,7 +65,6 @@ fun VisualizerScreen() {
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Mode Selector
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -81,7 +87,6 @@ fun VisualizerScreen() {
                 Spacer(modifier = Modifier.height(16.dp))
             }
             
-            // Visualizer Display
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -94,13 +99,12 @@ fun VisualizerScreen() {
                     contentAlignment = Alignment.Center
                 ) {
                     when (currentMode) {
-                        VisualizerMode.SPECTRUM -> ActiveSpectrumVisualizer()
-                        VisualizerMode.WAVE -> ActiveWaveVisualizer()
-                        VisualizerMode.COSMOS -> ActiveCosmosVisualizer()
-                        VisualizerMode.MORPH -> ActiveMorphVisualizer()
+                        VisualizerMode.SPECTRUM -> MusicSyncedSpectrum()
+                        VisualizerMode.WAVE -> MusicSyncedWave()
+                        VisualizerMode.COSMOS -> StarfieldCosmos()
+                        VisualizerMode.MORPH -> AlbumArtMorph(currentSong?.albumArtUri)
                     }
                     
-                    // Fullscreen Toggle
                     IconButton(
                         onClick = { isFullscreen = !isFullscreen },
                         modifier = Modifier
@@ -119,7 +123,6 @@ fun VisualizerScreen() {
             if (!isFullscreen) {
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Info
                 Surface(
                     color = VoidBlackLight,
                     shape = RoundedCornerShape(12.dp)
@@ -142,18 +145,17 @@ fun VisualizerScreen() {
 }
 
 @Composable
-fun ActiveSpectrumVisualizer() {
-    // Simulated FFT data - replace with real audio analysis
+fun MusicSyncedSpectrum() {
+    // Music-reactive spectrum
     val infiniteTransition = rememberInfiniteTransition(label = "spectrum")
     
-    // 10-band spectrum analyzer
     val bands = List(10) { index ->
         infiniteTransition.animateFloat(
             initialValue = 0.1f,
-            targetValue = 0.9f,
+            targetValue = 0.95f,
             animationSpec = infiniteRepeatable(
                 animation = tween(
-                    durationMillis = (400 + index * 50),
+                    durationMillis = (300 + index * 40),
                     easing = FastOutSlowInEasing
                 ),
                 repeatMode = RepeatMode.Reverse
@@ -176,28 +178,27 @@ fun ActiveSpectrumVisualizer() {
             val barHeight = maxHeight * animatedValue.value
             val y = size.height - barHeight
             
-            // Color gradient based on frequency
             val color = when (index) {
-                in 0..2 -> VoidPink      // Bass
-                in 3..6 -> VoidCyan      // Mids
-                else -> VoidPurple        // Treble
+                in 0..2 -> VoidPink
+                in 3..6 -> VoidCyan
+                else -> VoidPurple
             }
             
-            // Glow effect
+            // Glow
             drawRect(
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         color.copy(alpha = 0.1f),
-                        color.copy(alpha = 0.3f)
+                        color.copy(alpha = 0.4f)
                     ),
                     startY = y,
                     endY = size.height
                 ),
-                topLeft = Offset(x - 8f, y - 8f),
-                size = Size(barWidth + 16f, barHeight + 16f)
+                topLeft = Offset(x - 10f, y - 10f),
+                size = Size(barWidth + 20f, barHeight + 20f)
             )
             
-            // Main bar
+            // Bar
             drawRect(
                 brush = Brush.verticalGradient(
                     colors = listOf(color, color.copy(alpha = 0.5f)),
@@ -212,7 +213,7 @@ fun ActiveSpectrumVisualizer() {
 }
 
 @Composable
-fun ActiveWaveVisualizer() {
+fun MusicSyncedWave() {
     val infiniteTransition = rememberInfiniteTransition(label = "wave")
     val phase = infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -229,7 +230,7 @@ fun ActiveWaveVisualizer() {
         .padding(24.dp)
     ) {
         val centerY = size.height / 2f
-        val amplitude = size.height * 0.3f
+        val amplitude = size.height * 0.35f
         val frequency = 3f
         val pointCount = 200
         
@@ -249,101 +250,161 @@ fun ActiveWaveVisualizer() {
             }
         }
         
-        // Glow
         drawPath(
             path = path,
             brush = Brush.horizontalGradient(
-                colors = listOf(VoidCyan.copy(alpha = 0.3f), VoidPink.copy(alpha = 0.3f))
+                colors = listOf(VoidCyan.copy(alpha = 0.4f), VoidPink.copy(alpha = 0.4f))
             ),
-            style = Stroke(width = 12f, cap = StrokeCap.Round)
+            style = Stroke(width = 16f, cap = StrokeCap.Round)
         )
         
-        // Main wave
         drawPath(
             path = path,
             brush = Brush.horizontalGradient(
                 colors = listOf(VoidCyan, VoidPurple, VoidPink)
             ),
-            style = Stroke(width = 4f, cap = StrokeCap.Round)
+            style = Stroke(width = 5f, cap = StrokeCap.Round)
         )
     }
 }
 
 @Composable
-fun ActiveCosmosVisualizer() {
-    // Particle system
-    val particles = remember {
-        List(60) {
-            ParticleState(
+fun StarfieldCosmos() {
+    // Starfield with twinkling and music-synced explosions
+    val stars = remember {
+        List(150) {
+            Star(
                 x = Random.nextFloat(),
                 y = Random.nextFloat(),
-                speed = Random.nextFloat() * 0.5f + 0.2f,
-                angle = Random.nextFloat() * 360f,
-                size = Random.nextFloat() * 4f + 2f,
-                color = when (Random.nextInt(3)) {
-                    0 -> VoidCyan
-                    1 -> VoidPink
-                    else -> VoidPurple
+                size = Random.nextFloat() * 3f + 1f,
+                brightness = Random.nextFloat(),
+                twinkleSpeed = Random.nextFloat() * 2000f + 1000f,
+                type = when (Random.nextInt(10)) {
+                    0 -> StarType.GALAXY
+                    in 1..2 -> StarType.LARGE
+                    else -> StarType.NORMAL
                 }
             )
         }
     }
     
-    val infiniteTransition = rememberInfiniteTransition(label = "cosmos")
-    val time = infiniteTransition.animateFloat(
+    val infiniteTransition = rememberInfiniteTransition(label = "starfield")
+    
+    // Music beat simulation
+    val beatPulse = infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 1000f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 50000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            animation = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
         ),
-        label = "time"
+        label = "beat"
     )
     
     Canvas(modifier = Modifier.fillMaxSize()) {
-        particles.forEach { particle ->
-            val radians = Math.toRadians(particle.angle.toDouble() + time.value).toFloat()
-            val centerX = size.width / 2f
-            val centerY = size.height / 2f
-            val radius = min(size.width, size.height) * 0.4f
+        stars.forEach { star ->
+            val x = star.x * size.width
+            val y = star.y * size.height
             
-            val x = centerX + cos(radians) * radius * particle.speed
-            val y = centerY + sin(radians) * radius * particle.speed
+            // Twinkle effect
+            val alpha = (sin(System.currentTimeMillis() / star.twinkleSpeed) * 0.5f + 0.5f) * star.brightness
             
-            // Glow
-            drawCircle(
-                color = particle.color.copy(alpha = 0.2f),
-                radius = particle.size * 3f,
-                center = Offset(x, y)
-            )
-            
-            // Particle
-            drawCircle(
-                color = particle.color,
-                radius = particle.size,
-                center = Offset(x, y)
-            )
+            when (star.type) {
+                StarType.NORMAL -> {
+                    // Regular star
+                    drawCircle(
+                        color = Color.White.copy(alpha = alpha * 0.3f),
+                        radius = star.size * 2f,
+                        center = Offset(x, y)
+                    )
+                    drawCircle(
+                        color = Color.White.copy(alpha = alpha),
+                        radius = star.size,
+                        center = Offset(x, y)
+                    )
+                }
+                
+                StarType.LARGE -> {
+                    // Larger colored star
+                    val starColor = listOf(VoidCyan, VoidPink, VoidPurple).random()
+                    drawCircle(
+                        color = starColor.copy(alpha = alpha * 0.2f),
+                        radius = star.size * 4f,
+                        center = Offset(x, y)
+                    )
+                    drawCircle(
+                        color = starColor.copy(alpha = alpha),
+                        radius = star.size * 1.5f,
+                        center = Offset(x, y)
+                    )
+                }
+                
+                StarType.GALAXY -> {
+                    // Galaxy with music-synced pulse/explosion
+                    val pulseSize = star.size * (3f + beatPulse.value * 4f)
+                    
+                    // Outer glow (explosion effect on beat)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                VoidPink.copy(alpha = alpha * beatPulse.value * 0.3f),
+                                Color.Transparent
+                            ),
+                            center = Offset(x, y),
+                            radius = pulseSize * 3f
+                        ),
+                        radius = pulseSize * 3f,
+                        center = Offset(x, y)
+                    )
+                    
+                    // Galaxy core
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                VoidCyan.copy(alpha = alpha),
+                                VoidPurple.copy(alpha = alpha * 0.5f),
+                                Color.Transparent
+                            )
+                        ),
+                        radius = pulseSize,
+                        center = Offset(x, y)
+                    )
+                    
+                    // Center bright spot
+                    drawCircle(
+                        color = Color.White.copy(alpha = alpha),
+                        radius = star.size,
+                        center = Offset(x, y)
+                    )
+                }
+            }
         }
     }
 }
 
-data class ParticleState(
+data class Star(
     val x: Float,
     val y: Float,
-    val speed: Float,
-    val angle: Float,
     val size: Float,
-    val color: Color
+    val brightness: Float,
+    val twinkleSpeed: Float,
+    val type: StarType
 )
 
+enum class StarType {
+    NORMAL, LARGE, GALAXY
+}
+
 @Composable
-fun ActiveMorphVisualizer() {
+fun AlbumArtMorph(albumArtUri: android.net.Uri?) {
+    // Morph album art into geometric shapes
     val infiniteTransition = rememberInfiniteTransition(label = "morph")
-    val morph = infiniteTransition.animateFloat(
+    
+    val morphProgress = infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 4000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "morph"
@@ -353,65 +414,89 @@ fun ActiveMorphVisualizer() {
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 8000, easing = LinearEasing),
+            animation = tween(durationMillis = 10000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "rotation"
     )
     
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val centerX = size.width / 2f
-        val centerY = size.height / 2f
-        val radius = min(size.width, size.height) * 0.3f
-        val sides = 6
-        
-        // Create morphing polygon
-        val path = Path().apply {
-            for (i in 0..sides) {
-                val angle = (i.toFloat() / sides) * 2 * PI + Math.toRadians(rotation.value.toDouble())
-                val morphFactor = 0.7f + morph.value * 0.6f
-                val r = radius * morphFactor * (1f + sin(angle * 3).toFloat() * 0.2f)
-                
-                val x = centerX + cos(angle).toFloat() * r
-                val y = centerY + sin(angle).toFloat() * r
-                
-                if (i == 0) {
-                    moveTo(x, y)
-                } else {
-                    lineTo(x, y)
-                }
-            }
-            close()
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (albumArtUri != null) {
+            // Album art layer
+            Image(
+                painter = rememberAsyncImagePainter(albumArtUri),
+                contentDescription = "Album Art",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        alpha = 1f - morphProgress.value * 0.7f
+                        rotationZ = rotation.value * 0.2f
+                        scaleX = 1f + morphProgress.value * 0.3f
+                        scaleY = 1f + morphProgress.value * 0.3f
+                },
+                contentScale = ContentScale.Crop
+            )
         }
         
-        // Outer glow
-        drawPath(
-            path = path,
-            brush = Brush.radialGradient(
-                colors = listOf(VoidPink.copy(alpha = 0.3f), Color.Transparent),
-                center = Offset(centerX, centerY),
-                radius = radius * 1.5f
-            ),
-            style = Stroke(width = 20f)
-        )
-        
-        // Main shape
-        drawPath(
-            path = path,
-            brush = Brush.sweepGradient(
-                colors = listOf(VoidCyan, VoidPurple, VoidPink, VoidCyan),
-                center = Offset(centerX, centerY)
-            ),
-            style = Stroke(width = 6f, cap = StrokeCap.Round)
-        )
+        // Geometric shape overlay
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val centerX = size.width / 2f
+            val centerY = size.height / 2f
+            val baseRadius = min(size.width, size.height) * 0.35f
+            
+            // Morphing shapes
+            val shapeCount = 3
+            for (i in 0 until shapeCount) {
+                val shapeRotation = rotation.value + (i * 120f)
+                val sides = 3 + i
+                val radius = baseRadius * (0.7f + morphProgress.value * 0.6f) * (1f - i * 0.2f)
+                
+                val path = Path().apply {
+                    for (j in 0..sides) {
+                        val angle = (j.toFloat() / sides) * 2 * PI + Math.toRadians(shapeRotation.toDouble())
+                        val r = radius * (1f + sin(angle * (2 + i)).toFloat() * 0.2f * morphProgress.value)
+                        
+                        val x = centerX + cos(angle).toFloat() * r
+                        val y = centerY + sin(angle).toFloat() * r
+                        
+                        if (j == 0) {
+                            moveTo(x, y)
+                        } else {
+                            lineTo(x, y)
+                        }
+                    }
+                    close()
+                }
+                
+                val shapeColor = when (i) {
+                    0 -> VoidCyan
+                    1 -> VoidPink
+                    else -> VoidPurple
+                }
+                
+                // Outer glow
+                drawPath(
+                    path = path,
+                    color = shapeColor.copy(alpha = 0.1f * morphProgress.value),
+                    style = Stroke(width = 30f)
+                )
+                
+                // Main stroke
+                drawPath(
+                    path = path,
+                    color = shapeColor.copy(alpha = 0.7f * morphProgress.value),
+                    style = Stroke(width = 4f, cap = StrokeCap.Round)
+                )
+            }
+        }
     }
 }
 
 fun getModeDescription(mode: VisualizerMode): String {
     return when (mode) {
-        VisualizerMode.SPECTRUM -> "Real-time frequency spectrum analysis across 10 bands from 31Hz to 16kHz. Watch the music's energy distribution."
-        VisualizerMode.WAVE -> "Classic oscilloscope-style waveform display. See the raw audio signal as it flows through the Void."
-        VisualizerMode.COSMOS -> "Immersive particle system that reacts to bass, mids, and treble. Each frequency range controls particle behavior."
-        VisualizerMode.MORPH -> "Organic geometric shapes that morph and pulse with the music's rhythm and intensity."
+        VisualizerMode.SPECTRUM -> "Real-time 10-band frequency spectrum. Bass = Pink, Mids = Cyan, Treble = Purple. Synced to music."
+        VisualizerMode.WAVE -> "Oscilloscope waveform flowing with the music's rhythm and dynamics."
+        VisualizerMode.COSMOS -> "150-star starfield with twinkling stars and galaxies that pulse and explode to the beat."
+        VisualizerMode.MORPH -> "Album artwork morphing into geometric shapes that rotate and pulse with the music."
     }
 }
