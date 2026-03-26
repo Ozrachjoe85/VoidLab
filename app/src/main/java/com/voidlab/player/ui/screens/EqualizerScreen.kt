@@ -190,7 +190,7 @@ fun EqualizerScreen(
                             contentColor = VoidCyan
                         )
                     ) {
-                        Text(preset.name, maxLines = 1)
+                        Text(preset.displayName, maxLines = 1)
                     }
                 }
             }
@@ -210,7 +210,7 @@ fun EqualizerScreen(
                             contentColor = VoidCyan
                         )
                     ) {
-                        Text(preset.name, maxLines = 1)
+                        Text(preset.displayName, maxLines = 1)
                     }
                 }
             }
@@ -372,21 +372,6 @@ fun InteractiveCurveView(
                     topLeft = Offset(x, centerY - kotlin.math.abs(barHeight) / 2),
                     size = Size(barWidth, kotlin.math.abs(barHeight))
                 )
-                
-                // Value label
-                drawContext.canvas.nativeCanvas.apply {
-                    val paint = android.graphics.Paint().apply {
-                        this.color = android.graphics.Color.argb(255, 0, 220, 255)
-                        textSize = 24f
-                        textAlign = android.graphics.Paint.Align.CENTER
-                    }
-                    drawText(
-                        String.format("%+.0f", value),
-                        x + barWidth / 2,
-                        centerY - kotlin.math.abs(barHeight) / 2 - 12f,
-                        paint
-                    )
-                }
             }
             
             // Center line
