@@ -24,6 +24,27 @@ import com.voidlab.player.ui.viewmodels.LibraryViewModel
 import com.voidlab.player.ui.viewmodels.PlayerViewModel
 import com.voidlab.player.ui.viewmodels.SortMode
 
+@Composable
+fun LibraryScreen(
+    libraryViewModel: LibraryViewModel = hiltViewModel(),
+    playerViewModel: PlayerViewModel = hiltViewModel()  // Add this
+) {
+    val songs by libraryViewModel.songs.collectAsState()
+    val searchQuery by libraryViewModel.searchQuery.collectAsState()
+    
+    // ... rest of the screen
+    
+    // In your LazyColumn where songs are displayed:
+    items(songs) { song ->
+        SongItem(
+            song = song,
+            onClick = {
+                playerViewModel.playSong(song)  // Add this click handler
+            }
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
