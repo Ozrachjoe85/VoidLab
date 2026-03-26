@@ -12,9 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.voidlab.player.R
 import com.voidlab.player.data.models.AutoEQState
 import com.voidlab.player.ui.theme.*
 import com.voidlab.player.ui.viewmodels.PlayerViewModel
@@ -79,7 +82,7 @@ fun NowPlayingScreen(
                 }
             }
             
-            // Album Art
+            // Album Art with PROPER loading
             Surface(
                 modifier = Modifier
                     .size(300.dp)
@@ -89,7 +92,12 @@ fun NowPlayingScreen(
             ) {
                 if (currentSong?.albumArtUri != null) {
                     AsyncImage(
-                        model = currentSong!!.albumArtUri,
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(currentSong!!.albumArtUri)
+                            .crossfade(true)
+                            .error(R.drawable.ic_launcher_foreground) // Fallback
+                            .placeholder(R.drawable.ic_launcher_foreground)
+                            .build(),
                         contentDescription = "Album Art",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
