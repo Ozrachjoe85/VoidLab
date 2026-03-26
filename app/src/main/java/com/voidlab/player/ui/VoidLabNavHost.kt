@@ -9,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -88,12 +87,13 @@ fun VoidLabNavHost() {
             }
             
             composable(Screen.Equalizer.route) {
-                val viewModel: EQViewModel = hiltViewModel()
-                EqualizerScreen(viewModel = viewModel)
+                val eqViewModel: EQViewModel = hiltViewModel()
+                EqualizerScreen(viewModel = eqViewModel)
             }
             
             composable(Screen.Visualizer.route) {
-                VisualizerScreen()
+                // Pass playerViewModel for album art morphing
+                VisualizerScreen(playerViewModel = playerViewModel)
             }
             
             composable(Screen.Settings.route) {
