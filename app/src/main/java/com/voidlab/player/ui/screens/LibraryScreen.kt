@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.voidlab.player.data.models.Song
 import com.voidlab.player.ui.theme.*
@@ -24,32 +25,11 @@ import com.voidlab.player.ui.viewmodels.LibraryViewModel
 import com.voidlab.player.ui.viewmodels.PlayerViewModel
 import com.voidlab.player.ui.viewmodels.SortMode
 
-@Composable
-fun LibraryScreen(
-    libraryViewModel: LibraryViewModel = hiltViewModel(),
-    playerViewModel: PlayerViewModel = hiltViewModel()  // Add this
-) {
-    val songs by libraryViewModel.songs.collectAsState()
-    val searchQuery by libraryViewModel.searchQuery.collectAsState()
-    
-    // ... rest of the screen
-    
-    // In your LazyColumn where songs are displayed:
-    items(songs) { song ->
-        SongItem(
-            song = song,
-            onClick = {
-                playerViewModel.playSong(song)  // Add this click handler
-            }
-        )
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
-    playerViewModel: PlayerViewModel,
-    libraryViewModel: LibraryViewModel
+    playerViewModel: PlayerViewModel = hiltViewModel(),
+    libraryViewModel: LibraryViewModel = hiltViewModel()
 ) {
     val songs by libraryViewModel.songs.collectAsState()
     val searchQuery by libraryViewModel.searchQuery.collectAsState()
