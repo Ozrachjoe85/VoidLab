@@ -1,5 +1,6 @@
 package com.voidlab.player.ui.viewmodels
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -42,6 +43,7 @@ class PlayerViewModel @Inject constructor(
     
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            Log.d("PlayerViewModel", "Player onIsPlayingChanged: $isPlaying")
             _isPlaying.value = isPlaying
         }
         
@@ -55,15 +57,22 @@ class PlayerViewModel @Inject constructor(
     }
     
     fun setMediaController(controller: MediaController) {
+        Log.d("PlayerViewModel", "setMediaController called")
         mediaController?.removeListener(playerListener)
         mediaController = controller
         mediaController?.addListener(playerListener)
         _isPlaying.value = controller.isPlaying
         _isShuffleEnabled.value = controller.shuffleModeEnabled
         _repeatMode.value = controller.repeatMode
+        Log.d("PlayerViewModel", "MediaController set successfully, isPlaying: ${controller.isPlaying}")
     }
     
     fun playSong(song: Song) {
+        Log.d("PlayerViewModel", "========================================")
+        Log.d("PlayerViewModel", "playSong called for: ${song.title}")
+        Log.d("PlayerViewModel", "Song URI: ${song.uri}")
+        Log.d("PlayerViewModel", "MediaController is null: ${mediaController == null}")
+        
         _currentSong.value = song
         
         val mediaItem = MediaItem.Builder()
@@ -71,30 +80,48 @@ class PlayerViewModel @Inject constructor(
             .setUri(song.uri)
             .build()
         
+        Log.d("PlayerViewModel", "MediaItem created with URI: ${song.uri}")
+        
         mediaController?.apply {
+            Log.d("PlayerViewModel", "MediaController exists, setting media item")
             setMediaItem(mediaItem)
+            Log.d("PlayerViewModel", "Calling prepare()")
             prepare()
+            Log.d("PlayerViewModel", "Calling play()")
             play()
+            Log.d("PlayerViewModel", "Play command sent")
+            Log.d("PlayerViewModel", "MediaController.isPlaying: $isPlaying")
+            Log.d("PlayerViewModel", "MediaController.playbackState: $playbackState")
+        } ?: run {
+            Log.e("PlayerViewModel", "ERROR: MediaController is NULL! Cannot play song")
+            Log.e("PlayerViewModel", "This means MainActivity didn't call setMediaController()")
         }
+        
+        Log.d("PlayerViewModel", "========================================")
         
         checkIfFavorite(song.id)
     }
     
     fun playPause() {
+        Log.d("PlayerViewModel", "playPause called")
         mediaController?.apply {
             if (isPlaying) {
+                Log.d("PlayerViewModel", "Pausing playback")
                 pause()
             } else {
+                Log.d("PlayerViewModel", "Resuming playback")
                 play()
             }
-        }
+        } ?: Log.e("PlayerViewModel", "MediaController is null in playPause()")
     }
     
     fun skipToNext() {
+        Log.d("PlayerViewModel", "skipToNext called")
         mediaController?.seekToNext()
     }
     
     fun skipToPrevious() {
+        Log.d("PlayerViewModel", "skipToPrevious called")
         mediaController?.seekToPrevious()
     }
     
@@ -122,13 +149,14 @@ class PlayerViewModel @Inject constructor(
     private fun checkIfFavorite(songId: Long) {
         viewModelScope.launch {
             favoriteRepository.isFavorite(songId).collect { isFav ->
-    _isFavorite.value = isFav
+                _isFavorite.value = isFav
             }
         }
     }
     
     override fun onCleared() {
         super.onCleared()
+        Log.d("PlayerViewModel", "onCleared - removing listener")
         mediaController?.removeListener(playerListener)
     }
 }
