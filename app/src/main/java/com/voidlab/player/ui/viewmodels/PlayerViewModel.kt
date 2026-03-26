@@ -7,18 +7,16 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import com.voidlab.player.data.models.AutoEQState
 import com.voidlab.player.data.models.Song
-import com.voidlab.player.data.repository.EQRepository
 import com.voidlab.player.data.repository.FavoriteRepository
-import com.voidlab.player.data.repository.MusicRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
-    private val musicRepository: MusicRepository,
-    private val eqRepository: EQRepository,
     private val favoriteRepository: FavoriteRepository
 ) : ViewModel() {
     
@@ -28,49 +26,33 @@ class PlayerViewModel @Inject constructor(
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
     
-    private val _position = MutableStateFlow(0L)
-    val position: StateFlow<Long> = _position.asStateFlow()
-    
     private val _autoEQState = MutableStateFlow<AutoEQState>(AutoEQState.Idle)
     val autoEQState: StateFlow<AutoEQState> = _autoEQState.asStateFlow()
     
-    private val _isShuffleEnabled = MutableStateFlow(false)
-    val isShuffleEnabled: StateFlow<Boolean> = _isShuffleEnabled.asStateFlow()
-    
-    private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
-    val repeatMode: StateFlow<Int> = _repeatMode.asStateFlow()
-    
-    val isFavorite: StateFlow<Boolean> = currentSong.flatMapLatest { song ->
-        if (song != null) {
-            favoriteRepository.isFavorite(song.id)
-        } else {
-            flowOf(false)
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    private val _isFavorite = MutableStateFlow(false)
+    val isFavorite: StateFlow<Boolean> = _isFavorite.asStateFlow()
     
     private var mediaController: MediaController? = null
     
+    private val playerListener = object : Player.Listener {
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            _isPlaying.value = isPlaying
+        }
+    }
+    
     fun setMediaController(controller: MediaController) {
+        mediaController?.removeListener(playerListener)
         mediaController = controller
-        
-        controller.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                _isPlaying.value = isPlaying
-            }
-            
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                mediaItem?.mediaId?.toLongOrNull()?.let { songId ->
-                    _currentSong.value = musicRepository.findSongById(songId)
-                    loadEQState(songId)
-                }
-            }
-        })
+        mediaController?.addListener(playerListener)
+        _isPlaying.value = controller.isPlaying
     }
     
     fun playSong(song: Song) {
+        _currentSong.value = song
+        
         val mediaItem = MediaItem.Builder()
-            .setUri(song.uri)
             .setMediaId(song.id.toString())
+            .setUri(song.uri)
             .build()
         
         mediaController?.apply {
@@ -79,22 +61,17 @@ class PlayerViewModel @Inject constructor(
             play()
         }
         
-        _currentSong.value = song
-        loadEQState(song.id)
+        checkIfFavorite(song.id)
     }
     
     fun playPause() {
-        mediaController?.let {
-            if (it.isPlaying) {
-                it.pause()
+        mediaController?.apply {
+            if (isPlaying) {
+                pause()
             } else {
-                it.play()
+                play()
             }
         }
-    }
-    
-    fun seekTo(position: Long) {
-        mediaController?.seekTo(position)
     }
     
     fun skipToNext() {
@@ -105,42 +82,22 @@ class PlayerViewModel @Inject constructor(
         mediaController?.seekToPrevious()
     }
     
-    fun toggleShuffle() {
-        mediaController?.let {
-            val newShuffleMode = !it.shuffleModeEnabled
-            it.shuffleModeEnabled = newShuffleMode
-            _isShuffleEnabled.value = newShuffleMode
-        }
-    }
-    
-    fun cycleRepeatMode() {
-        mediaController?.let {
-            val newMode = when (it.repeatMode) {
-                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-                Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-                else -> Player.REPEAT_MODE_OFF
-            }
-            it.repeatMode = newMode
-            _repeatMode.value = newMode
-        }
-    }
-    
     fun toggleFavorite() {
+        val song = _currentSong.value ?: return
         viewModelScope.launch {
-            currentSong.value?.let { song ->
-                favoriteRepository.toggleFavorite(song.id)
-            }
+            favoriteRepository.toggleFavorite(song.id)
+            checkIfFavorite(song.id)
         }
     }
     
-    private fun loadEQState(songId: Long) {
+    private fun checkIfFavorite(songId: Long) {
         viewModelScope.launch {
-            val profile = eqRepository.getProfileForSong(songId)
-            _autoEQState.value = if (profile != null && profile.isAutoLearned) {
-                AutoEQState.Learned(profile)
-            } else {
-                AutoEQState.Idle
-            }
+            _isFavorite.value = favoriteRepository.isFavorite(songId)
         }
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        mediaController?.removeListener(playerListener)
     }
 }
