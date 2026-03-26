@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.voidlab.player.audio.playback.PlaybackService
 import com.voidlab.player.ui.VoidLabNavHost
@@ -28,17 +30,23 @@ class MainActivity : ComponentActivity() {
     
     private val playerViewModel: PlayerViewModel by viewModels()
     private var mediaController: MediaController? = null
+    private lateinit var controllerFuture: ListenableFuture<MediaController>
     
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
+            Log.d("MainActivity", "Permission granted, initializing MediaController")
             initializeMediaController()
+        } else {
+            Log.e("MainActivity", "Permission denied!")
         }
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        Log.d("MainActivity", "onCreate started")
         
         checkPermissions()
         
@@ -66,29 +74,50 @@ class MainActivity : ComponentActivity() {
                 this,
                 permission
             ) == PackageManager.PERMISSION_GRANTED -> {
+                Log.d("MainActivity", "Permission already granted")
                 initializeMediaController()
             }
             else -> {
+                Log.d("MainActivity", "Requesting permission")
                 requestPermissionLauncher.launch(permission)
             }
         }
     }
     
     private fun initializeMediaController() {
+        Log.d("MainActivity", "Initializing MediaController...")
+        
         val sessionToken = SessionToken(
             this,
             ComponentName(this, PlaybackService::class.java)
         )
         
-        val controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
+        controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
         controllerFuture.addListener({
-            mediaController = controllerFuture.get()
-            playerViewModel.setMediaController(mediaController!!)
+            try {
+                mediaController = controllerFuture.get()
+                Log.d("MainActivity", "MediaController connected successfully!")
+                playerViewModel.setMediaController(mediaController!!)
+                Log.d("MainActivity", "MediaController set in PlayerViewModel")
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Failed to connect MediaController", e)
+            }
         }, MoreExecutors.directExecutor())
     }
     
+    override fun onStart() {
+        super.onStart()
+        Log.d("MainActivity", "onStart")
+    }
+    
+    override fun onStop() {
+        super.onStop()
+        Log.d("MainActivity", "onStop")
+    }
+    
     override fun onDestroy() {
-        mediaController?.release()
+        Log.d("MainActivity", "onDestroy - releasing MediaController")
+        MediaController.releaseFuture(controllerFuture)
         super.onDestroy()
     }
 }
