@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -32,6 +33,10 @@ fun VoidLabNavHost() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    
+    // CRITICAL FIX: Create PlayerViewModel ONCE at the top level
+    // This ensures all screens share the SAME instance
+    val playerViewModel: PlayerViewModel = hiltViewModel()
     
     val items = listOf(
         Screen.NowPlaying,
@@ -69,13 +74,13 @@ fun VoidLabNavHost() {
             modifier = Modifier.padding(padding)
         ) {
             composable(Screen.NowPlaying.route) {
-                val viewModel: PlayerViewModel = hiltViewModel()
-                NowPlayingScreen(viewModel = viewModel)
+                // Pass the SHARED playerViewModel instance
+                NowPlayingScreen(viewModel = playerViewModel)
             }
             
             composable(Screen.Library.route) {
-                val playerViewModel: PlayerViewModel = hiltViewModel()
                 val libraryViewModel: LibraryViewModel = hiltViewModel()
+                // Pass the SHARED playerViewModel instance
                 LibraryScreen(
                     playerViewModel = playerViewModel,
                     libraryViewModel = libraryViewModel
