@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.voidlab.player.ui.theme.*
@@ -302,6 +303,7 @@ fun FaderControl(
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var faderHeight by remember { mutableStateOf(0f) }
+    val density = LocalDensity.current
     
     Column(
         modifier = modifier,
@@ -353,7 +355,7 @@ fun FaderControl(
             
             // Fader knob
             val knobPosition = ((12f - value) / 24f).coerceIn(0f, 1f)
-            val knobOffsetDp = (knobPosition * (maxHeightPx / density - 20f)).dp
+            val knobOffsetDp = with(density) { (knobPosition * (maxHeightPx / density.density - 20f)).dp }
             
             Box(
                 modifier = Modifier
