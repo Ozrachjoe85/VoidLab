@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
+import com.voidlab.player.audio.analysis.FrequencyAnalyzer
 import com.voidlab.player.data.models.AutoEQState
 import com.voidlab.player.data.models.Song
 import com.voidlab.player.data.repository.FavoriteRepository
@@ -19,7 +20,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
-    private val favoriteRepository: FavoriteRepository
+    private val favoriteRepository: FavoriteRepository,
+    private val frequencyAnalyzer: FrequencyAnalyzer  // INJECTED!
 ) : ViewModel() {
     
     private val _currentSong = MutableStateFlow<Song?>(null)
@@ -49,6 +51,9 @@ class PlayerViewModel @Inject constructor(
     // PLAYLIST/QUEUE MANAGEMENT
     private val _playlist = MutableStateFlow<List<Song>>(emptyList())
     val playlist: StateFlow<List<Song>> = _playlist.asStateFlow()
+    
+    // REAL-TIME SPECTRUM for visualizers - ALIVE!
+    val currentSpectrum = frequencyAnalyzer.currentSpectrum
     
     private var currentIndex = 0
     
@@ -99,48 +104,38 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             while (true) {
                 mediaController?.let { controller ->
-                    if (controller.isPlaying) {
-                        _currentPosition.value = controller.currentPosition
+                    _currentPosition.value = controller.currentPosition
+                    if (_duration.value <= 0) {
                         _duration.value = controller.duration
                     }
                 }
-                delay(100) // Update every 100ms for smooth progress
+                delay(100)
             }
         }
     }
     
     fun setMediaController(controller: MediaController) {
-        Log.d("PlayerViewModel", "========================================")
-        Log.d("PlayerViewModel", "setMediaController called on instance: ${this.hashCode()}")
         mediaController?.removeListener(playerListener)
         mediaController = controller
-        mediaController?.addListener(playerListener)
+        controller.addListener(playerListener)
+        
+        // Initialize state from controller
         _isPlaying.value = controller.isPlaying
         _isShuffleEnabled.value = controller.shuffleModeEnabled
         _repeatMode.value = controller.repeatMode
-        Log.d("PlayerViewModel", "MediaController set successfully!")
-        Log.d("PlayerViewModel", "MediaController.isPlaying: ${controller.isPlaying}")
-        Log.d("PlayerViewModel", "========================================")
+        _duration.value = controller.duration
     }
     
-    /**
-     * Play a full playlist/queue starting at a specific index.
-     * This enables Next/Previous navigation and auto-advance.
-     */
+    fun playSong(song: Song) {
+        Log.d("PlayerViewModel", "playSong: ${song.title}")
+        playPlaylist(listOf(song), 0)
+    }
+    
     fun playPlaylist(songs: List<Song>, startIndex: Int = 0) {
-        Log.d("PlayerViewModel", "========================================")
-        Log.d("PlayerViewModel", "playPlaylist called with ${songs.size} songs, startIndex=$startIndex")
-        
-        if (songs.isEmpty()) {
-            Log.e("PlayerViewModel", "Empty playlist!")
-            return
-        }
-        
+        Log.d("PlayerViewModel", "playPlaylist: ${songs.size} songs, startIndex: $startIndex")
         _playlist.value = songs
-        currentIndex = startIndex.coerceIn(0, songs.size - 1)
-        _currentSong.value = songs[currentIndex]
+        currentIndex = startIndex
         
-        // Build MediaItem list for ExoPlayer
         val mediaItems = songs.map { song ->
             MediaItem.Builder()
                 .setMediaId(song.id.toString())
@@ -148,98 +143,60 @@ class PlayerViewModel @Inject constructor(
                 .build()
         }
         
-        Log.d("PlayerViewModel", "Built ${mediaItems.size} MediaItems")
-        
-        mediaController?.apply {
-            Log.d("PlayerViewModel", "Setting media items and starting playback")
-            setMediaItems(mediaItems, currentIndex, 0)
-            prepare()
-            play()
+        mediaController?.let { controller ->
+            controller.setMediaItems(mediaItems, startIndex, 0)
+            controller.prepare()
+            controller.play()
             
-            // Update duration
-            _duration.value = duration
-            
-            Log.d("PlayerViewModel", "Playback started!")
-            Log.d("PlayerViewModel", "MediaController.isPlaying: $isPlaying")
-            Log.d("PlayerViewModel", "MediaController.playbackState: $playbackState")
-        } ?: run {
-            Log.e("PlayerViewModel", "ERROR: MediaController is NULL!")
+            _currentSong.value = songs.getOrNull(startIndex)
+            _currentSong.value?.let { checkIfFavorite(it.id) }
         }
-        
-        Log.d("PlayerViewModel", "========================================")
-        
-        checkIfFavorite(songs[currentIndex].id)
     }
     
-    /**
-     * Play a single song (creates a 1-song playlist).
-     * Use playPlaylist() for better queue management.
-     */
-    fun playSong(song: Song) {
-        playPlaylist(listOf(song), 0)
-    }
-    
-    fun playPause() {
-        Log.d("PlayerViewModel", "playPause called")
-        mediaController?.apply {
-            if (isPlaying) {
-                Log.d("PlayerViewModel", "Pausing playback")
-                pause()
+    fun togglePlayPause() {
+        mediaController?.let { controller ->
+            if (controller.isPlaying) {
+                controller.pause()
             } else {
-                Log.d("PlayerViewModel", "Resuming playback")
-                play()
+                controller.play()
             }
-        } ?: Log.e("PlayerViewModel", "MediaController is null in playPause()")
-    }
-    
-    fun skipToNext() {
-        Log.d("PlayerViewModel", "skipToNext called, currentIndex=$currentIndex, playlistSize=${_playlist.value.size}")
-        
-        mediaController?.apply {
-            if (hasNextMediaItem()) {
-                seekToNext()
-                Log.d("PlayerViewModel", "Skipped to next track")
-            } else {
-                Log.d("PlayerViewModel", "No next track available")
-            }
-        } ?: Log.e("PlayerViewModel", "MediaController is null in skipToNext()")
-    }
-    
-    fun skipToPrevious() {
-        Log.d("PlayerViewModel", "skipToPrevious called")
-        
-        mediaController?.apply {
-            if (hasPreviousMediaItem()) {
-                seekToPrevious()
-                Log.d("PlayerViewModel", "Skipped to previous track")
-            } else {
-                Log.d("PlayerViewModel", "No previous track available")
-            }
-        } ?: Log.e("PlayerViewModel", "MediaController is null in skipToPrevious()")
+        }
     }
     
     fun seekTo(position: Long) {
         mediaController?.seekTo(position)
     }
     
+    fun skipToNext() {
+        mediaController?.seekToNext()
+    }
+    
+    fun skipToPrevious() {
+        mediaController?.seekToPrevious()
+    }
+    
     fun toggleShuffle() {
-        mediaController?.shuffleModeEnabled = !(_isShuffleEnabled.value)
+        mediaController?.let { controller ->
+            controller.shuffleModeEnabled = !controller.shuffleModeEnabled
+        }
     }
     
     fun cycleRepeatMode() {
-        val newMode = when (_repeatMode.value) {
-            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-            else -> Player.REPEAT_MODE_OFF
+        mediaController?.let { controller ->
+            controller.repeatMode = when (controller.repeatMode) {
+                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                else -> Player.REPEAT_MODE_OFF
+            }
         }
-        mediaController?.repeatMode = newMode
     }
     
     fun toggleFavorite() {
-        val song = _currentSong.value ?: return
-        viewModelScope.launch {
-            favoriteRepository.toggleFavorite(song.id)
-            checkIfFavorite(song.id)
+        _currentSong.value?.let { song ->
+            viewModelScope.launch {
+                favoriteRepository.toggleFavorite(song.id)
+                checkIfFavorite(song.id)
+            }
         }
     }
     
@@ -252,8 +209,7 @@ class PlayerViewModel @Inject constructor(
     }
     
     override fun onCleared() {
-        super.onCleared()
-        Log.d("PlayerViewModel", "onCleared (instance ${this.hashCode()}) - removing listener")
         mediaController?.removeListener(playerListener)
+        super.onCleared()
     }
 }
