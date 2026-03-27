@@ -210,7 +210,7 @@ fun NowPlayingScreen(
                 
                 // Play/Pause
                 FloatingActionButton(
-                    onClick = { viewModel.playPause() },
+                    onClick = { viewModel.togglePlayPause() },
                     containerColor = VoidCyan,
                     modifier = Modifier.size(72.dp)
                 ) {
