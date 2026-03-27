@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlin.math.log10
 import kotlin.math.sqrt
 
-class FrequencyAnalyzer(private val audioSessionId: Int) {
+class FrequencyAnalyzer(val audioSessionId: Int) {  // Changed to val (public) instead of private val
     
     private var visualizer: Visualizer? = null
     private val snapshots = mutableListOf<FloatArray>()
@@ -25,9 +25,7 @@ class FrequencyAnalyzer(private val audioSessionId: Int) {
                             visualizer: Visualizer?,
                             waveform: ByteArray?,
                             samplingRate: Int
-                        ) {
-                            // Not used for EQ analysis
-                        }
+                        ) {}
                         
                         override fun onFftDataCapture(
                             visualizer: Visualizer?,
@@ -37,7 +35,7 @@ class FrequencyAnalyzer(private val audioSessionId: Int) {
                             fft?.let { processFft(it) }
                         }
                     },
-                    Visualizer.getMaxCaptureRate() / 2,
+                    Visualizer.getMaxCaptureRate(),
                     false,
                     true
                 )
@@ -49,36 +47,40 @@ class FrequencyAnalyzer(private val audioSessionId: Int) {
     }
     
     fun stop() {
-        visualizer?.apply {
-            enabled = false
-            release()
-        }
+        visualizer?.enabled = false
+        visualizer?.release()
         visualizer = null
+        snapshots.clear()
     }
     
     private fun processFft(fft: ByteArray) {
-        val bands = FloatArray(10)
-        val fftSize = fft.size / 2
+        val magnitudes = FloatArray(10)
         
-        // Map FFT bins to 10 frequency bands
-        val bandRanges = listOf(
-            0 to 2,      // 31 Hz
-            2 to 4,      // 62 Hz
-            4 to 8,      // 125 Hz
-            8 to 16,     // 250 Hz
-            16 to 32,    // 500 Hz
-            32 to 64,    // 1 kHz
-            64 to 128,   // 2 kHz
-            128 to 256,  // 4 kHz
-            256 to 512,  // 8 kHz
-            512 to fftSize.coerceAtMost(1024) // 16 kHz
+        // 10-band frequency ranges (Hz)
+        val bands = arrayOf(
+            31..62,    // Sub-bass
+            62..125,   // Bass
+            125..250,  // Low mids
+            250..500,  // Mids
+            500..1000, // Upper mids
+            1000..2000,
+            2000..4000,
+            4000..8000,
+            8000..16000,
+            16000..22050
         )
         
-        bandRanges.forEachIndexed { index, (start, end) ->
+        val sampleRate = 44100
+        val numSamples = fft.size / 2
+        
+        bands.forEachIndexed { index, range ->
+            val startBin = (range.first * numSamples / (sampleRate / 2)).coerceAtLeast(1)
+            val endBin = (range.last * numSamples / (sampleRate / 2)).coerceAtMost(numSamples - 1)
+            
             var sum = 0f
             var count = 0
             
-            for (i in start until end.coerceAtMost(fftSize)) {
+            for (i in startBin..endBin) {
                 val real = fft[i * 2].toFloat()
                 val imag = fft[i * 2 + 1].toFloat()
                 val magnitude = sqrt(real * real + imag * imag)
@@ -86,17 +88,18 @@ class FrequencyAnalyzer(private val audioSessionId: Int) {
                 count++
             }
             
-            val average = if (count > 0) sum / count else 0f
-            bands[index] = if (average > 0) 20 * log10(average.coerceAtLeast(1f)) else -96f
+            val avgMagnitude = if (count > 0) sum / count else 0f
+            val db = if (avgMagnitude > 0) 20 * log10(avgMagnitude) else -96f
+            magnitudes[index] = ((db + 96f) / 96f).coerceIn(0f, 1f)
         }
         
-        _currentSpectrum.value = bands
-        snapshots.add(bands.copyOf())
-    }
-    
-    fun getSnapshots(): List<FloatArray> = snapshots.toList()
-    
-    fun clearSnapshots() {
-        snapshots.clear()
+        snapshots.add(magnitudes)
+        if (snapshots.size > 10) snapshots.removeAt(0)
+        
+        val smoothed = FloatArray(10) { i ->
+            snapshots.map { it[i] }.average().toFloat()
+        }
+        
+        _currentSpectrum.value = smoothed
     }
 }
