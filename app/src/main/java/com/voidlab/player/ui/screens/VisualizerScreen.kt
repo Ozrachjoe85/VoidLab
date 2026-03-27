@@ -12,7 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -40,6 +39,7 @@ fun VisualizerScreen(
 ) {
     var currentMode by remember { mutableStateOf(VisualizerMode.COSMOS) }
     val spectrum by viewModel.currentSpectrum.collectAsState()
+    val currentSong by viewModel.currentSong.collectAsState()
     
     Box(
         modifier = Modifier
@@ -121,7 +121,7 @@ fun ModeButton(
 }
 
 // ============================================================================
-// COSMOS VISUALIZER - EPIC VERSION WITH 800 STARS
+// COSMOS VISUALIZER - 800 STARS, NEBULAE, SHOOTING STARS, SUPERNOVAE
 // ============================================================================
 @Composable
 fun CosmosVisualizer(
@@ -153,7 +153,6 @@ fun CosmosVisualizer(
     
     var time by remember { mutableStateOf(0f) }
     val bass = spectrum.take(2).average().toFloat()
-    val mids = spectrum.slice(3..6).average().toFloat()
     val treble = spectrum.slice(7..9).average().toFloat()
     
     var supernovaIntensity by remember { mutableStateOf(0f) }
@@ -199,7 +198,7 @@ fun CosmosVisualizer(
     }
     
     Canvas(modifier = modifier.fillMaxSize()) {
-        // NEBULA CLOUDS
+        // NEBULA CLOUDS (background)
         nebulae.forEach { nebula ->
             val centerX = nebula.x * size.width
             val centerY = nebula.y * size.height
@@ -219,7 +218,7 @@ fun CosmosVisualizer(
             )
         }
         
-        // BASS SHOCKWAVE
+        // BASS SHOCKWAVE (center rings)
         if (bass > 0.5f) {
             val ringRadius = (bass * size.width * 0.5f).coerceAtMost(size.width)
             drawCircle(
@@ -230,7 +229,7 @@ fun CosmosVisualizer(
             )
         }
         
-        // STARS with parallax
+        // STARS with parallax depth
         stars.forEach { star ->
             val offsetX = (time * star.speed * star.depth * size.width) % size.width
             val x = (star.x * size.width + offsetX) % size.width
@@ -269,7 +268,7 @@ fun CosmosVisualizer(
             )
         }
         
-        // SUPERNOVA FLASH
+        // SUPERNOVA FLASH (screen overlay)
         if (supernovaIntensity > 0f) {
             drawRect(
                 color = Color.White.copy(alpha = supernovaIntensity * 0.6f),
@@ -317,7 +316,6 @@ fun MorphVisualizer(
     val mids = spectrum.slice(3..6).average().toFloat()
     val treble = spectrum.slice(7..9).average().toFloat()
     
-    // Morph shapes (circle → triangle → square → pentagon → hexagon)
     val shapes = remember {
         listOf(
             MorphShape(sides = 32, radius = 150f, hue = 180f), // Circle
@@ -354,7 +352,7 @@ fun MorphVisualizer(
             center = Offset(centerX, centerY)
         )
         
-        // Draw morphing shapes
+        // Morphing shapes
         shapes.forEachIndexed { index, shape ->
             val layerRotation = rotation + index * 72f
             val warpAmount = bass * 30f
@@ -368,7 +366,7 @@ fun MorphVisualizer(
                 for (i in 0..vertices) {
                     val angle = (i * 2 * PI / vertices).toFloat()
                     
-                    // Add bass-reactive warping
+                    // Bass-reactive warping
                     val warp = sin(morphPhase * 5f + i) * warpAmount
                     val r = radius + warp
                     
@@ -383,7 +381,7 @@ fun MorphVisualizer(
                 }
                 path.close()
                 
-                // Draw shape with spectrum-reactive color
+                // Spectrum-reactive color
                 val color = Color.hsv(
                     hue = (shape.hue + morphPhase * 20f) % 360f,
                     saturation = 0.8f,
