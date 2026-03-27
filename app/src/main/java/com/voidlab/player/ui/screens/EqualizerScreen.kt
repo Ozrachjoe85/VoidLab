@@ -1,13 +1,12 @@
 package com.voidlab.player.ui.screens
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -22,48 +21,54 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.voidlab.player.data.models.EQProfile
 import com.voidlab.player.ui.theme.*
 import com.voidlab.player.ui.viewmodels.EQViewModel
 import com.voidlab.player.ui.viewmodels.ViewMode
 
-@OptIn(ExperimentalMaterial3Api::class)
+val bandLabels = listOf("31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k")
+
 @Composable
 fun EqualizerScreen(
     viewModel: EQViewModel
 ) {
-    val isAutoMode by viewModel.isAutoMode.collectAsState()
     val currentProfile by viewModel.currentProfile.collectAsState()
+    val isAutoMode by viewModel.isAutoMode.collectAsState()
     val viewMode by viewModel.viewMode.collectAsState()
-    val learnedProfiles by viewModel.learnedProfiles.collectAsState()
+    val currentSpectrum by viewModel.currentSpectrum.collectAsState()
     val learnedProfileCount by viewModel.learnedProfileCount.collectAsState()
     
-    // REAL-TIME SPECTRUM - Makes EQ ALIVE!
-    val currentSpectrum by viewModel.currentSpectrum.collectAsState()
+    // Track the original (mastered) profile before Auto EQ adjustments
+    var originalProfile by remember { mutableStateOf<EQProfile?>(null) }
     
-    Box(
+    // When entering Auto mode, capture the current profile as "original"
+    LaunchedEffect(isAutoMode) {
+        if (isAutoMode && originalProfile == null) {
+            originalProfile = currentProfile
+        } else if (!isAutoMode) {
+            originalProfile = null
+        }
+    }
+    
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(VoidBlack, VoidBlackLight)
-                )
-            )
+            .background(VoidBlack)
+            .padding(16.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Column {
                 Text(
                     text = "EQUALIZER",
                     style = MaterialTheme.typography.headlineMedium,
@@ -71,284 +76,236 @@ fun EqualizerScreen(
                     fontWeight = FontWeight.Bold
                 )
                 
-                if (isAutoMode && learnedProfileCount > 0) {
-                    Surface(
-                        color = VoidCyan.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(12.dp)
+                if (isAutoMode) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 4.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Album,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = VoidCyan
-                            )
-                            Text(
-                                text = "$learnedProfileCount learned",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = VoidCyan,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                        Icon(
+                            Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = VoidPink,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "AUTO EQ ACTIVE",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = VoidPink,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Auto Mode Toggle
+            // View mode toggle
             Surface(
+                onClick = {
+                    viewModel.setViewMode(
+                        if (viewMode == ViewMode.CURVE) ViewMode.MIXER else ViewMode.CURVE
+                    )
+                },
                 color = VoidBlackLight,
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Auto EQ Mode",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = VoidCyan,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = if (isAutoMode) "✓ Learning active" else "Manual control",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (isAutoMode) VoidGreen else VoidCyan.copy(alpha = 0.6f)
-                        )
-                    }
-                    
-                    Switch(
-                        checked = isAutoMode,
-                        onCheckedChange = { viewModel.toggleAutoMode() },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = VoidCyan,
-                            checkedTrackColor = VoidCyan.copy(alpha = 0.5f),
-                            uncheckedThumbColor = VoidCyan.copy(alpha = 0.3f),
-                            uncheckedTrackColor = VoidCyan.copy(alpha = 0.1f)
-                        )
+                    Icon(
+                        if (viewMode == ViewMode.CURVE) Icons.Default.ShowChart else Icons.Default.Tune,
+                        contentDescription = null,
+                        tint = VoidCyan,
+                        modifier = Modifier.size(20.dp)
                     )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // View Mode Selector
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ViewModeButton(
-                    label = "Curve",
-                    icon = Icons.Default.ShowChart,
-                    isSelected = viewMode == ViewMode.CURVE,
-                    onClick = { viewModel.setViewMode(ViewMode.CURVE) },
-                    modifier = Modifier.weight(1f)
-                )
-                ViewModeButton(
-                    label = "Mixer",
-                    icon = Icons.Default.Settings,
-                    isSelected = viewMode == ViewMode.MIXER,
-                    onClick = { viewModel.setViewMode(ViewMode.MIXER) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // EQ Visualization - WITH SPECTRUM!
-            val currentBands = currentProfile?.getBands() ?: List(10) { 0f }
-            
-            Surface(
-                color = VoidBlackLight,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                when (viewMode) {
-                    ViewMode.CURVE -> {
-                        InteractiveCurveView(
-                            bands = currentBands,
-                            spectrum = currentSpectrum,
-                            onBandChange = { index, value ->
-                                if (!isAutoMode) {
-                                    viewModel.updateBandLevel(index, value)
-                                }
-                            }
-                        )
-                    }
-                    ViewMode.MIXER -> {
-                        ProMixerBoardView(
-                            bands = currentBands,
-                            spectrum = currentSpectrum,
-                            onBandChange = { index, value ->
-                                if (!isAutoMode) {
-                                    viewModel.updateBandLevel(index, value)
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Presets
-            Text(
-                text = "PRESETS",
-                style = MaterialTheme.typography.titleSmall,
-                color = VoidCyan.copy(alpha = 0.7f),
-                fontWeight = FontWeight.Bold
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                viewModel.presets.take(4).forEach { preset ->
-                    PresetButton(
-                        preset = preset,
-                        onClick = { viewModel.applyPreset(preset) },
-                        modifier = Modifier.weight(1f)
+                    Text(
+                        text = if (viewMode == ViewMode.CURVE) "CURVE" else "MIXER",
+                        color = VoidCyan,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
                     )
                 }
             }
         }
-    }
-}
-
-@Composable
-fun ViewModeButton(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.height(48.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isSelected) VoidCyan else VoidBlackLight,
-            contentColor = if (isSelected) VoidBlack else VoidCyan
-        ),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(label, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
-    }
-}
-
-@Composable
-fun PresetButton(
-    preset: com.voidlab.player.data.models.EQPreset,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.height(40.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = VoidCyan.copy(alpha = 0.1f),
-            contentColor = VoidCyan
-        ),
-        shape = RoundedCornerShape(8.dp)
-    ) {
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Auto EQ toggle
+        Surface(
+            onClick = { viewModel.toggleAutoMode() },
+            color = if (isAutoMode) VoidCyan.copy(alpha = 0.15f) else VoidBlackLight,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = if (isAutoMode) VoidCyan else VoidCyan.copy(alpha = 0.5f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column {
+                        Text(
+                            text = "Auto EQ Learning",
+                            color = if (isAutoMode) VoidCyan else VoidCyan.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "$learnedProfileCount profiles learned",
+                            color = VoidCyan.copy(alpha = 0.5f),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+                
+                Switch(
+                    checked = isAutoMode,
+                    onCheckedChange = { viewModel.toggleAutoMode() },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = VoidCyan,
+                        checkedTrackColor = VoidCyan.copy(alpha = 0.3f)
+                    )
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // EQ Visualization
+        when (viewMode) {
+            ViewMode.CURVE -> InteractiveCurveView(
+                currentProfile = currentProfile,
+                originalProfile = originalProfile,
+                spectrum = currentSpectrum,
+                isAutoMode = isAutoMode,
+                onBandChange = viewModel::updateBandLevel,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(250.dp)
+            )
+            ViewMode.MIXER -> ProMixerBoardView(
+                currentProfile = currentProfile,
+                originalProfile = originalProfile,
+                spectrum = currentSpectrum,
+                isAutoMode = isAutoMode,
+                onBandChange = viewModel::updateBandLevel,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(350.dp)
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Presets
         Text(
-            preset.displayName,
-            maxLines = 1,
-            style = MaterialTheme.typography.labelSmall
+            text = "PRESETS",
+            style = MaterialTheme.typography.titleMedium,
+            color = VoidCyan,
+            fontWeight = FontWeight.Bold
         )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            viewModel.presets.take(4).forEach { preset ->
+                Surface(
+                    onClick = { viewModel.applyPreset(preset) },
+                    color = VoidBlackLight,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = preset.displayName,
+                        color = VoidCyan,
+                        modifier = Modifier.padding(12.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
 fun InteractiveCurveView(
-    bands: List<Float>,
-    spectrum: FloatArray = FloatArray(10),
+    currentProfile: EQProfile?,
+    originalProfile: EQProfile?,
+    spectrum: FloatArray,
+    isAutoMode: Boolean,
     onBandChange: (Int, Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var dragIndex by remember { mutableStateOf(-1) }
-    val bandCount = 10
+    val bands = currentProfile?.getBands() ?: List(10) { 0f }
+    val originalBands = originalProfile?.getBands()
     
-    Canvas(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        val index = (offset.x / size.width * bandCount).toInt().coerceIn(0, bandCount - 1)
-                        dragIndex = index
-                    },
-                    onDrag = { change, _ ->
-                        if (dragIndex >= 0) {
-                            val normalizedY = 1f - (change.position.y / size.height)
-                            val value = (normalizedY * 24f - 12f).coerceIn(-12f, 12f)
-                            onBandChange(dragIndex, value)
-                        }
-                    },
-                    onDragEnd = {
-                        dragIndex = -1
-                    }
-                )
+    Canvas(modifier = modifier
+        .clip(RoundedCornerShape(16.dp))
+        .background(VoidBlackLight)
+        .pointerInput(Unit) {
+            detectDragGestures { change, _ ->
+                val x = change.position.x
+                val y = change.position.y
+                val bandIndex = (x / size.width * 10).toInt().coerceIn(0, 9)
+                val value = ((size.height - y) / size.height * 24f - 12f).coerceIn(-12f, 12f)
+                onBandChange(bandIndex, value)
             }
+        }
     ) {
         val width = size.width
         val height = size.height
-        val bandSpacing = width / (bandCount - 1)
+        val bandWidth = width / 10
         
-        // SPECTRUM BARS - Draw FIRST (behind everything) - ALIVE!
-        spectrum.forEachIndexed { index, value ->
-            val x = index * bandSpacing
-            val barHeight = value * height * 0.8f
-            val barWidth = bandSpacing * 0.6f
+        // Draw spectrum bars (ghosted in background)
+        for (i in 0 until 10) {
+            val specValue = spectrum.getOrNull(i) ?: 0f
+            val barHeight = specValue * height * 0.3f
             
             drawRect(
                 color = VoidCyan.copy(alpha = 0.15f),
-                topLeft = Offset(x - barWidth / 2, height - barHeight),
-                size = Size(barWidth, barHeight)
+                topLeft = Offset(i * bandWidth + bandWidth * 0.2f, height - barHeight),
+                size = Size(bandWidth * 0.6f, barHeight)
             )
         }
         
-        // Grid lines
-        for (i in 0..4) {
-            val y = height * i / 4
-            drawLine(
-                color = VoidCyan.copy(alpha = 0.1f),
-                start = Offset(0f, y),
-                end = Offset(width, y),
-                strokeWidth = 1f
+        // Draw original profile curve (if Auto EQ is active)
+        if (isAutoMode && originalBands != null) {
+            val originalPath = Path()
+            originalBands.forEachIndexed { index, value ->
+                val x = index * bandWidth + bandWidth / 2
+                val y = height / 2 - (value / 12f * height / 2)
+                
+                if (index == 0) {
+                    originalPath.moveTo(x, y)
+                } else {
+                    originalPath.lineTo(x, y)
+                }
+            }
+            
+            drawPath(
+                path = originalPath,
+                color = VoidCyan.copy(alpha = 0.3f),
+                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
             )
         }
         
-        // Center line (0 dB)
-        drawLine(
-            color = VoidCyan.copy(alpha = 0.3f),
-            start = Offset(0f, height / 2),
-            end = Offset(width, height / 2),
-            strokeWidth = 2f
-        )
-        
-        // EQ Curve
+        // Draw current EQ curve
         val path = Path()
         bands.forEachIndexed { index, value ->
-            val x = index * bandSpacing
-            val normalizedValue = (value + 12f) / 24f
-            val y = height * (1f - normalizedValue)
+            val x = index * bandWidth + bandWidth / 2
+            val y = height / 2 - (value / 12f * height / 2)
             
             if (index == 0) {
                 path.moveTo(x, y)
@@ -357,217 +314,135 @@ fun InteractiveCurveView(
             }
         }
         
-        // Draw curve
         drawPath(
             path = path,
-            color = VoidCyan,
-            style = Stroke(width = 4f, cap = StrokeCap.Round)
+            color = if (isAutoMode) VoidPink else VoidCyan,
+            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
         )
         
         // Draw control points
         bands.forEachIndexed { index, value ->
-            val x = index * bandSpacing
-            val normalizedValue = (value + 12f) / 24f
-            val y = height * (1f - normalizedValue)
+            val x = index * bandWidth + bandWidth / 2
+            val y = height / 2 - (value / 12f * height / 2)
             
             drawCircle(
-                color = VoidCyan,
-                radius = if (dragIndex == index) 12f else 8f,
-                center = Offset(x, y)
-            )
-            drawCircle(
-                color = VoidBlack,
-                radius = if (dragIndex == index) 6f else 4f,
+                color = if (isAutoMode) VoidPink else VoidCyan,
+                radius = 6.dp.toPx(),
                 center = Offset(x, y)
             )
         }
+        
+        // Draw center line
+        drawLine(
+            color = VoidCyan.copy(alpha = 0.2f),
+            start = Offset(0f, height / 2),
+            end = Offset(width, height / 2),
+            strokeWidth = 1.dp.toPx()
+        )
     }
 }
 
 @Composable
 fun ProMixerBoardView(
-    bands: List<Float>,
-    spectrum: FloatArray = FloatArray(10),
+    currentProfile: EQProfile?,
+    originalProfile: EQProfile?,
+    spectrum: FloatArray,
+    isAutoMode: Boolean,
     onBandChange: (Int, Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val frequencies = listOf("31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k")
+    val bands = currentProfile?.getBands() ?: List(10) { 0f }
+    val originalBands = originalProfile?.getBands()
     
     Row(
         modifier = modifier
-            .fillMaxSize()
+            .clip(RoundedCornerShape(16.dp))
+            .background(VoidBlackLight)
             .padding(16.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         bands.forEachIndexed { index, value ->
-            ProFaderChannel(
-                value = value,
-                label = frequencies[index],
-                spectrumLevel = spectrum.getOrNull(index)?.times(96f) ?: 0f,
-                onValueChange = { newValue ->
-                    onBandChange(index, newValue)
-                }
-            )
-        }
-    }
-}
-
-@Composable
-fun ProFaderChannel(
-    value: Float,
-    label: String,
-    spectrumLevel: Float,
-    onValueChange: (Float) -> Unit
-) {
-    var dragValue by remember { mutableStateOf(value) }
-    
-    LaunchedEffect(value) {
-        dragValue = value
-    }
-    
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxHeight()
-    ) {
-        // LED dB display
-        Surface(
-            color = VoidBlack,
-            shape = RoundedCornerShape(4.dp),
-            modifier = Modifier.size(width = 45.dp, height = 22.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f)
+            ) {
+                // Label
                 Text(
-                    text = String.format("%+.1f", dragValue),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = when {
-                        dragValue > 6f -> VoidPink
-                        dragValue > 0f -> VoidCyan
-                        else -> VoidGreen
-                    },
+                    text = bandLabels[index],
+                    color = VoidCyan.copy(alpha = 0.6f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Fader with spectrum and original overlay
+                Box(
+                    modifier = Modifier
+                        .width(30.dp)
+                        .height(200.dp),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val width = size.width
+                        val height = size.height
+                        
+                        // Draw spectrum bar
+                        val specValue = spectrum.getOrNull(index) ?: 0f
+                        val barHeight = specValue * height * 0.5f
+                        
+                        drawRect(
+                            color = VoidCyan.copy(alpha = 0.2f),
+                            topLeft = Offset(0f, height - barHeight),
+                            size = Size(width, barHeight)
+                        )
+                        
+                        // Draw original fader position (if Auto EQ active)
+                        if (isAutoMode && originalBands != null) {
+                            val originalValue = originalBands[index]
+                            val originalY = height / 2 - (originalValue / 12f * height / 2)
+                            
+                            drawRect(
+                                color = VoidCyan.copy(alpha = 0.3f),
+                                topLeft = Offset(0f, originalY - 2.dp.toPx()),
+                                size = Size(width, 4.dp.toPx())
+                            )
+                        }
+                        
+                        // Draw track
+                        drawRect(
+                            color = VoidBlack,
+                            topLeft = Offset(width / 2 - 2.dp.toPx(), 0f),
+                            size = Size(4.dp.toPx(), height)
+                        )
+                    }
+                    
+                    // Draggable knob
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .offset(y = (-100.dp * (value / 12f)).coerceIn(-100.dp, 100.dp))
+                            .clip(CircleShape)
+                            .background(if (isAutoMode) VoidPink else VoidCyan)
+                            .pointerInput(index) {
+                                detectDragGestures { change, dragAmount ->
+                                    val newValue = (value - dragAmount.y / 200f * 24f).coerceIn(-12f, 12f)
+                                    onBandChange(index, newValue)
+                                }
+                            }
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Value display
+                Text(
+                    text = "${value.toInt()}dB",
+                    color = if (isAutoMode) VoidPink else VoidCyan,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
         }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        // Fader track with spectrum visualization - ALIVE!
-        Box(
-            modifier = Modifier
-                .width(50.dp)
-                .weight(1f)
-        ) {
-            Canvas(modifier = Modifier
-                .width(8.dp)
-                .fillMaxHeight()
-                .align(Alignment.Center)
-            ) {
-                // SPECTRUM LEVEL - Draw FIRST (background) - ALIVE!
-                val normalizedSpec = ((spectrumLevel + 96f) / 96f).coerceIn(0f, 1f)
-                val specHeight = size.height * normalizedSpec
-                
-                drawRect(
-                    color = VoidCyan.copy(alpha = 0.2f),
-                    topLeft = Offset(0f, size.height - specHeight),
-                    size = Size(size.width, specHeight)
-                )
-                
-                // Track
-                drawRoundRect(
-                    color = Color(0xFF0d0d0d),
-                    size = size,
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
-                )
-                
-                // Center notch
-                val centerY = size.height / 2f
-                drawLine(
-                    color = VoidCyan.copy(alpha = 0.5f),
-                    start = Offset(-6.dp.toPx(), centerY),
-                    end = Offset(size.width + 6.dp.toPx(), centerY),
-                    strokeWidth = 2.dp.toPx()
-                )
-                
-                // Active section
-                val normalizedValue = (dragValue + 12f) / 24f
-                val faderY = size.height * (1f - normalizedValue)
-                
-                if (faderY < centerY) {
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(VoidPink.copy(alpha = 0.6f), VoidCyan.copy(alpha = 0.4f)),
-                            startY = faderY,
-                            endY = centerY
-                        ),
-                        topLeft = Offset(0f, faderY),
-                        size = Size(size.width, centerY - faderY)
-                    )
-                } else {
-                    drawRect(
-                        color = VoidPurple.copy(alpha = 0.4f),
-                        topLeft = Offset(0f, centerY),
-                        size = Size(size.width, faderY - centerY)
-                    )
-                }
-            }
-            
-            // Fader knob
-            val normalizedValue = (dragValue + 12f) / 24f
-            val maxOffset = 320.dp
-            
-            Box(
-                modifier = Modifier
-                    .offset(y = maxOffset * (1f - normalizedValue) - 12.dp)
-                    .size(50.dp, 24.dp)
-                    .align(Alignment.TopCenter)
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures { change, dragAmount ->
-                            change.consume()
-                            val sensitivity = 0.15f
-                            val delta = -dragAmount * sensitivity
-                            dragValue = (dragValue + delta).coerceIn(-12f, 12f)
-                        }
-                    }
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures(
-                            onDragEnd = { onValueChange(dragValue) },
-                            onVerticalDrag = { _, _ -> }
-                        )
-                    }
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    shape = RoundedCornerShape(4.dp),
-                    color = Color(0xFF2a2a2a),
-                    shadowElevation = 4.dp
-                ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(Color(0xFF404040), Color(0xFF1a1a1a))
-                            ),
-                            size = size
-                        )
-                        
-                        drawLine(
-                            color = VoidCyan,
-                            start = Offset(size.width * 0.2f, size.height / 2),
-                            end = Offset(size.width * 0.8f, size.height / 2),
-                            strokeWidth = 2.dp.toPx(),
-                            cap = StrokeCap.Round
-                        )
-                    }
-                }
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = VoidCyan.copy(alpha = 0.7f),
-            fontWeight = FontWeight.Medium
-        )
     }
 }
