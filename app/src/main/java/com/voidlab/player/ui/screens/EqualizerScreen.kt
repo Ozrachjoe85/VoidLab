@@ -12,7 +12,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -302,6 +301,7 @@ fun FaderControl(
     modifier: Modifier = Modifier
 ) {
     var isDragging by remember { mutableStateOf(false) }
+    var faderHeight by remember { mutableStateOf(0f) }
     
     Column(
         modifier = modifier,
@@ -316,13 +316,16 @@ fun FaderControl(
         
         Spacer(modifier = Modifier.height(4.dp))
         
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .width(40.dp)
                 .weight(1f)
                 .clip(RoundedCornerShape(20.dp))
                 .background(VoidBlack)
         ) {
+            val maxHeightPx = constraints.maxHeight.toFloat()
+            faderHeight = maxHeightPx
+            
             // Spectrum background
             Box(
                 modifier = Modifier
@@ -350,13 +353,14 @@ fun FaderControl(
             
             // Fader knob
             val knobPosition = ((12f - value) / 24f).coerceIn(0f, 1f)
+            val knobOffsetDp = (knobPosition * (maxHeightPx / density - 20f)).dp
             
             Box(
                 modifier = Modifier
                     .width(40.dp)
                     .height(20.dp)
+                    .offset(y = knobOffsetDp)
                     .align(Alignment.TopCenter)
-                    .offset(y = (knobPosition * (1f - 20f / this@Box.maxHeight.value)).dp)
                     .clip(RoundedCornerShape(10.dp))
                     .background(if (isDragging) VoidCyan else VoidPurple)
                     .pointerInput(Unit) {
@@ -365,8 +369,7 @@ fun FaderControl(
                             onDragEnd = { isDragging = false },
                             onDragCancel = { isDragging = false }
                         ) { _, dragAmount ->
-                            val heightPx = this.size.height
-                            val delta = (dragAmount / heightPx) * 24f
+                            val delta = (dragAmount / faderHeight) * 24f
                             val newValue = (value - delta).coerceIn(-12f, 12f)
                             onValueChange(newValue)
                         }
