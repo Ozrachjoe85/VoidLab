@@ -41,9 +41,9 @@ class EQViewModel @Inject constructor(
     
     val presets = listOf(
         EQPreset.FLAT,
-        EQPreset.BASS_BOOST,
-        EQPreset.TREBLE_BOOST,
-        EQPreset.VOCAL
+        EQPreset.ROCK,
+        EQPreset.POP,
+        EQPreset.JAZZ
     )
     
     init {
@@ -75,7 +75,7 @@ class EQViewModel @Inject constructor(
     
     private fun loadLearnedProfiles() {
         viewModelScope.launch {
-            eqRepository.getAllProfiles().collect { profiles ->
+            eqRepository.getAllLearnedProfiles().collect { profiles ->
                 _learnedProfiles.value = profiles
                 _learnedProfileCount.value = profiles.size
             }
@@ -110,24 +110,25 @@ class EQViewModel @Inject constructor(
         _currentProfile.value = updated
     }
     
-    // FIXED: Create new EQProfile with preset values
+    // FIXED: Use bandValues array from EQPreset
     fun applyPreset(preset: EQPreset) {
         val current = _currentProfile.value ?: return
+        val bands = preset.bandValues
         
         val updated = EQProfile(
             songId = current.songId,
             songTitle = current.songTitle,
             songArtist = current.songArtist,
-            band31Hz = preset.band31Hz,
-            band62Hz = preset.band62Hz,
-            band125Hz = preset.band125Hz,
-            band250Hz = preset.band250Hz,
-            band500Hz = preset.band500Hz,
-            band1kHz = preset.band1kHz,
-            band2kHz = preset.band2kHz,
-            band4kHz = preset.band4kHz,
-            band8kHz = preset.band8kHz,
-            band16kHz = preset.band16kHz,
+            band31Hz = bands[0],
+            band62Hz = bands[1],
+            band125Hz = bands[2],
+            band250Hz = bands[3],
+            band500Hz = bands[4],
+            band1kHz = bands[5],
+            band2kHz = bands[6],
+            band4kHz = bands[7],
+            band8kHz = bands[8],
+            band16kHz = bands[9],
             isAutoLearned = false
         )
         
