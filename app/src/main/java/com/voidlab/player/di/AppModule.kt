@@ -2,7 +2,6 @@ package com.voidlab.player.di
 
 import android.content.Context
 import androidx.room.Room
-import com.voidlab.player.audio.analysis.FrequencyAnalyzer
 import com.voidlab.player.data.database.VoidLabDatabase
 import com.voidlab.player.data.repository.MusicRepository
 import dagger.Module
@@ -44,13 +43,5 @@ object AppModule {
         return MusicRepository(context)
     }
     
-    @Provides
-    @Singleton
-    fun provideFrequencyAnalyzer(): FrequencyAnalyzer {
-        // NOTE: Using audioSessionId = 0 for now
-        // The FrequencyAnalyzer will be properly initialized with the actual
-        // ExoPlayer audioSessionId when PlaybackService starts
-        // This is just to satisfy Hilt dependency injection
-        return FrequencyAnalyzer(audioSessionId = 0)
-    }
+    // FrequencyAnalyzer is now provided via @Inject constructor - no need for provider
 }
