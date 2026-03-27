@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import com.voidlab.player.audio.analysis.FrequencyAnalyzer
@@ -21,7 +22,7 @@ import javax.inject.Inject
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val favoriteRepository: FavoriteRepository,
-    private val frequencyAnalyzer: FrequencyAnalyzer  // INJECTED!
+    private val frequencyAnalyzer: FrequencyAnalyzer
 ) : ViewModel() {
     
     private val _currentSong = MutableStateFlow<Song?>(null)
@@ -78,14 +79,34 @@ class PlayerViewModel @Inject constructor(
         
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             Log.d("PlayerViewModel", "Media item transition: ${mediaItem?.mediaId}")
-            // Update current song when track changes
-            mediaItem?.mediaId?.toLongOrNull()?.let { songId ->
+            
+            // FIXED: Extract metadata from MediaItem
+            if (mediaItem != null) {
+                val songId = mediaItem.mediaId.toLongOrNull() ?: 0
+                
+                // First try to get from playlist
                 val song = _playlist.value.find { it.id == songId }
+                
                 if (song != null) {
                     _currentSong.value = song
                     currentIndex = _playlist.value.indexOf(song)
-                    checkIfFavorite(songId)
+                } else {
+                    // Fallback: Extract from MediaItem metadata
+                    val metadata = mediaItem.mediaMetadata
+                    _currentSong.value = Song(
+                        id = songId,
+                        uri = mediaItem.localConfiguration?.uri ?: android.net.Uri.EMPTY,
+                        title = metadata.title?.toString() ?: "Unknown",
+                        artist = metadata.artist?.toString() ?: "Unknown",
+                        album = metadata.albumTitle?.toString() ?: "Unknown",
+                        duration = mediaController?.duration ?: 0L,
+                        albumArtUri = metadata.artworkUri,
+                        dateAdded = 0L,
+                        size = 0L
+                    )
                 }
+                
+                checkIfFavorite(songId)
             }
             
             // Update duration
@@ -136,10 +157,19 @@ class PlayerViewModel @Inject constructor(
         _playlist.value = songs
         currentIndex = startIndex
         
+        // FIXED: Include full metadata in EVERY MediaItem
         val mediaItems = songs.map { song ->
             MediaItem.Builder()
                 .setMediaId(song.id.toString())
                 .setUri(song.uri)
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(song.title)
+                        .setArtist(song.artist)
+                        .setAlbumTitle(song.album)
+                        .setArtworkUri(song.albumArtUri)
+                        .build()
+                )
                 .build()
         }
         
