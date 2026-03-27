@@ -33,8 +33,8 @@ fun VoidLabNavHost() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     
-    // CRITICAL FIX: Create PlayerViewModel ONCE at the top level
-    // This ensures all screens share the SAME instance
+    // CRITICAL: Create PlayerViewModel ONCE at top level
+    // All screens share the SAME instance
     val playerViewModel: PlayerViewModel = hiltViewModel()
     
     val items = listOf(
@@ -73,16 +73,14 @@ fun VoidLabNavHost() {
             modifier = Modifier.padding(padding)
         ) {
             composable(Screen.NowPlaying.route) {
-                // Pass the SHARED playerViewModel instance
                 NowPlayingScreen(viewModel = playerViewModel)
             }
             
             composable(Screen.Library.route) {
                 val libraryViewModel: LibraryViewModel = hiltViewModel()
-                // Pass the SHARED playerViewModel instance
                 LibraryScreen(
-                    playerViewModel = playerViewModel,
-                    libraryViewModel = libraryViewModel
+                    libraryViewModel = libraryViewModel,
+                    playerViewModel = playerViewModel
                 )
             }
             
@@ -92,8 +90,7 @@ fun VoidLabNavHost() {
             }
             
             composable(Screen.Visualizer.route) {
-                // Pass playerViewModel for album art morphing
-                VisualizerScreen(playerViewModel = playerViewModel)
+                VisualizerScreen(viewModel = playerViewModel)
             }
             
             composable(Screen.Settings.route) {
