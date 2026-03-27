@@ -229,13 +229,15 @@ fun CosmosVisualizer(
             )
         }
         
-        // STARS with parallax depth
+        // STARS with parallax depth - FIXED LINE 238
         stars.forEach { star ->
             val offsetX = (time * star.speed * star.depth * size.width) % size.width
             val x = (star.x * size.width + offsetX) % size.width
             val y = star.y * size.height
             
-            val twinkle = 0.3f + spectrum.getOrNull((star.x * 10).toInt() % 10)?.times(0.7f) ?: 0f
+            // FIXED: Proper null handling
+            val specIndex = ((star.x * 10).toInt() % 10).coerceIn(0, spectrum.size - 1)
+            val twinkle = 0.3f + (spectrum.getOrNull(specIndex) ?: 0f) * 0.7f
             val alpha = twinkle * (0.5f + star.depth * 0.5f)
             val visualSize = star.size * (0.5f + star.depth * 1.5f)
             
