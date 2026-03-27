@@ -1,9 +1,11 @@
 package com.voidlab.player.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -12,133 +14,329 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import com.voidlab.player.R
 import com.voidlab.player.data.models.Song
 import com.voidlab.player.ui.theme.*
 import com.voidlab.player.ui.viewmodels.LibraryViewModel
 import com.voidlab.player.ui.viewmodels.PlayerViewModel
-import com.voidlab.player.ui.viewmodels.SortMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
-    playerViewModel: PlayerViewModel,
-    libraryViewModel: LibraryViewModel
+    libraryViewModel: LibraryViewModel,
+    playerViewModel: PlayerViewModel
 ) {
-    val songs by libraryViewModel.songs.collectAsState()
+    val songs by libraryViewModel.filteredSongs.collectAsState()
     val searchQuery by libraryViewModel.searchQuery.collectAsState()
-    val sortMode by libraryViewModel.sortMode.collectAsState()
+    val isLoading by libraryViewModel.isLoading.collectAsState()
+    val showFavoritesOnly by libraryViewModel.showFavoritesOnly.collectAsState()
     
-    Column(
+    var showFilterSheet by remember { mutableStateOf(false) }
+    
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(VoidBlack, VoidBlackLight)
+                )
+            )
     ) {
-        // Header
-        Text(
-            text = "LIBRARY",
-            style = MaterialTheme.typography.headlineMedium,
-            color = VoidCyan,
-            fontWeight = FontWeight.Bold
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Search bar
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { libraryViewModel.setSearchQuery(it) },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Search songs...") },
-            leadingIcon = {
-                Icon(Icons.Default.Search, contentDescription = "Search")
-            },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { libraryViewModel.setSearchQuery("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "LIBRARY",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = VoidCyan,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                // Filter indicator
+                if (showFavoritesOnly) {
+                    Surface(
+                        color = VoidPink.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Favorite,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = VoidPink
+                            )
+                            Text(
+                                text = "Favorites",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = VoidPink,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
-            },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = VoidCyan,
-                unfocusedBorderColor = VoidCyan.copy(alpha = 0.5f),
-                focusedTextColor = VoidCyan,
-                unfocusedTextColor = VoidCyan
-            ),
-            singleLine = true
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Sort options
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            SortMode.entries.take(3).forEach { mode ->
-                FilterChip(
-                    selected = sortMode == mode,
-                    onClick = { libraryViewModel.setSortMode(mode) },
-                    label = { Text(mode.name) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = VoidCyan,
-                        selectedLabelColor = VoidBlack
-                    )
-                )
             }
-        }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            SortMode.entries.drop(3).forEach { mode ->
-                FilterChip(
-                    selected = sortMode == mode,
-                    onClick = { libraryViewModel.setSortMode(mode) },
-                    label = { Text(mode.name) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = VoidCyan,
-                        selectedLabelColor = VoidBlack
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Search bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { libraryViewModel.setSearchQuery(it) },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = {
+                    Text(
+                        "Search songs, artists, albums...",
+                        color = VoidCyan.copy(alpha = 0.5f)
                     )
-                )
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Song count
-        Text(
-            text = "${songs.size} songs",
-            style = MaterialTheme.typography.bodyMedium,
-            color = VoidCyan.copy(alpha = 0.7f)
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        // Songs list
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(songs, key = { it.id }) { song ->
-                SongItem(
-                    song = song,
-                    onClick = {
-                        // CRITICAL: Pass the ENTIRE song list as a playlist!
-                        val allSongs = songs
-                        val clickedIndex = allSongs.indexOf(song)
-                        playerViewModel.playPlaylist(allSongs, clickedIndex)
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint = VoidCyan
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { libraryViewModel.setSearchQuery("") }) {
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = "Clear",
+                                tint = VoidCyan
+                            )
+                        }
                     }
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = VoidCyan,
+                    unfocusedTextColor = VoidCyan,
+                    focusedBorderColor = VoidCyan,
+                    unfocusedBorderColor = VoidCyan.copy(alpha = 0.3f),
+                    cursorColor = VoidCyan
+                ),
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Song count
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (showFavoritesOnly) {
+                        "${songs.size} favorites"
+                    } else {
+                        "${songs.size} songs"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = VoidCyan.copy(alpha = 0.7f)
+                )
+                
+                TextButton(
+                    onClick = { libraryViewModel.refreshLibrary() }
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = VoidCyan
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Refresh", color = VoidCyan)
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Song list
+            if (isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = VoidCyan)
+                }
+            } else if (songs.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            if (showFavoritesOnly) Icons.Default.FavoriteBorder else Icons.Default.MusicNote,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = VoidCyan.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = if (showFavoritesOnly) {
+                                "No favorites yet"
+                            } else if (searchQuery.isNotEmpty()) {
+                                "No songs found"
+                            } else {
+                                "No songs in library"
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = VoidCyan.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(songs, key = { it.id }) { song ->
+                        SongItem(
+                            song = song,
+                            onClick = {
+                                playerViewModel.playPlaylist(songs, songs.indexOf(song))
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        
+        // FAB for filter
+        FloatingActionButton(
+            onClick = { showFilterSheet = true },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            containerColor = VoidCyan,
+            contentColor = VoidBlack
+        ) {
+            Icon(
+                if (showFavoritesOnly) Icons.Default.Favorite else Icons.Default.FilterList,
+                contentDescription = "Filter"
+            )
+        }
+    }
+    
+    // Filter bottom sheet
+    if (showFilterSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showFilterSheet = false },
+            containerColor = VoidBlackLight
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "FILTER",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = VoidCyan,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // All Songs option
+                FilterOption(
+                    label = "All Songs",
+                    icon = Icons.Default.MusicNote,
+                    isSelected = !showFavoritesOnly,
+                    onClick = {
+                        libraryViewModel.setShowFavoritesOnly(false)
+                        showFilterSheet = false
+                    }
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Favorites option
+                FilterOption(
+                    label = "Favorites Only",
+                    icon = Icons.Default.Favorite,
+                    isSelected = showFavoritesOnly,
+                    onClick = {
+                        libraryViewModel.setShowFavoritesOnly(true)
+                        showFilterSheet = false
+                    }
+                )
+                
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun FilterOption(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        color = if (isSelected) VoidCyan.copy(alpha = 0.2f) else Color.Transparent,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = if (isSelected) VoidCyan else VoidCyan.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (isSelected) VoidCyan else VoidCyan.copy(alpha = 0.7f),
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+            
+            if (isSelected) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = VoidCyan
                 )
             }
         }
@@ -148,56 +346,32 @@ fun LibraryScreen(
 @Composable
 fun SongItem(
     song: Song,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         color = VoidBlackLight,
-        shape = RoundedCornerShape(8.dp)
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Album art thumbnail
-            Surface(
+            // Album art
+            AsyncImage(
+                model = song.albumArtUri,
+                contentDescription = null,
                 modifier = Modifier
                     .size(56.dp)
                     .clip(RoundedCornerShape(8.dp)),
-                color = VoidBlack
-            ) {
-                if (song.albumArtUri != null) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(song.albumArtUri)
-                            .crossfade(true)
-                            .error(R.drawable.ic_launcher_foreground)
-                            .placeholder(R.drawable.ic_launcher_foreground)
-                            .build(),
-                        contentDescription = "Album Art",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MusicNote,
-                            contentDescription = null,
-                            tint = VoidCyan.copy(alpha = 0.3f),
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.width(12.dp))
+                contentScale = ContentScale.Crop
+            )
             
             // Song info
             Column(
@@ -207,19 +381,19 @@ fun SongItem(
                     text = song.title,
                     style = MaterialTheme.typography.bodyLarge,
                     color = VoidCyan,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                
                 Text(
-                    text = "${song.artist} • ${song.album}",
+                    text = song.artist,
                     style = MaterialTheme.typography.bodySmall,
-                    color = VoidCyan.copy(alpha = 0.6f),
-                    maxLines = 1
+                    color = VoidCyan.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            
-            Spacer(modifier = Modifier.width(8.dp))
             
             // Duration
             Text(
@@ -232,8 +406,7 @@ fun SongItem(
 }
 
 private fun formatDuration(millis: Long): String {
-    val totalSeconds = (millis / 1000).toInt()
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return "$minutes:${seconds.toString().padStart(2, '0')}"
+    val seconds = (millis / 1000) % 60
+    val minutes = (millis / (1000 * 60)) % 60
+    return String.format("%d:%02d", minutes, seconds)
 }
