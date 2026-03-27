@@ -18,28 +18,29 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import com.voidlab.player.ui.theme.*
 import com.voidlab.player.ui.viewmodels.PlayerViewModel
+import kotlinx.coroutines.delay
 import kotlin.math.*
 import kotlin.random.Random
 
+// REMOVED: SPECTRUM, WAVE
+// ADDED: PULSE, PARTICLES
 enum class VisualizerMode {
-    SPECTRUM, WAVE, COSMOS, MORPH
+    COSMOS, MORPH, PULSE, PARTICLES
 }
 
 @Composable
 fun VisualizerScreen(
     playerViewModel: PlayerViewModel
 ) {
-    var currentMode by remember { mutableStateOf(VisualizerMode.SPECTRUM) }
+    var currentMode by remember { mutableStateOf(VisualizerMode.COSMOS) }
     var isFullscreen by remember { mutableStateOf(false) }
     
-    // Get current song for album art morphing
     val currentSong by playerViewModel.currentSong.collectAsState()
+    val spectrum by playerViewModel.currentSpectrum.collectAsState()
     
     Box(
         modifier = Modifier
@@ -88,293 +89,263 @@ fun VisualizerScreen(
             }
             
             Surface(
+                color = VoidBlack,
+                shape = RoundedCornerShape(16.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                color = VoidBlack,
-                shape = if (!isFullscreen) RoundedCornerShape(12.dp) else RoundedCornerShape(0.dp)
+                    .weight(1f)
             ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    when (currentMode) {
-                        VisualizerMode.SPECTRUM -> MusicSyncedSpectrum()
-                        VisualizerMode.WAVE -> MusicSyncedWave()
-                        VisualizerMode.COSMOS -> StarfieldCosmos()
-                        VisualizerMode.MORPH -> AlbumArtMorph(currentSong?.albumArtUri)
-                    }
-                    
-                    IconButton(
-                        onClick = { isFullscreen = !isFullscreen },
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                            contentDescription = if (isFullscreen) "Exit Fullscreen" else "Fullscreen",
-                            tint = VoidCyan.copy(alpha = 0.7f)
-                        )
-                    }
-                }
-            }
-            
-            if (!isFullscreen) {
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Surface(
-                    color = VoidBlackLight,
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = getModeDescription(currentMode),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = VoidCyan.copy(alpha = 0.8f)
-                        )
-                    }
+                when (currentMode) {
+                    VisualizerMode.COSMOS -> CosmosVisualizer(spectrum = spectrum)
+                    VisualizerMode.MORPH -> MorphVisualizer(
+                        spectrum = spectrum,
+                        albumArtUri = currentSong?.albumArtUri
+                    )
+                    VisualizerMode.PULSE -> PulseVisualizer(spectrum = spectrum)
+                    VisualizerMode.PARTICLES -> ParticlesVisualizer(spectrum = spectrum)
                 }
             }
         }
     }
 }
 
+// ============================================================================
+// EPIC COSMOS - 800 Stars, Nebulae, Supernovae, Shooting Stars
+// ============================================================================
 @Composable
-fun MusicSyncedSpectrum() {
-    // Music-reactive spectrum
-    val infiniteTransition = rememberInfiniteTransition(label = "spectrum")
-    
-    val bands = List(10) { index ->
-        infiniteTransition.animateFloat(
-            initialValue = 0.1f,
-            targetValue = 0.95f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(
-                    durationMillis = (300 + index * 40),
-                    easing = FastOutSlowInEasing
-                ),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "band$index"
-        )
-    }
-    
-    Canvas(modifier = Modifier
-        .fillMaxSize()
-        .padding(24.dp)
-    ) {
-        val barCount = bands.size
-        val barWidth = size.width / (barCount * 2.2f)
-        val spacing = barWidth * 0.6f
-        val maxHeight = size.height * 0.85f
-        
-        bands.forEachIndexed { index, animatedValue ->
-            val x = index * (barWidth + spacing) + spacing
-            val barHeight = maxHeight * animatedValue.value
-            val y = size.height - barHeight
-            
-            val color = when (index) {
-                in 0..2 -> VoidPink
-                in 3..6 -> VoidCyan
-                else -> VoidPurple
-            }
-            
-            // Glow
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        color.copy(alpha = 0.1f),
-                        color.copy(alpha = 0.4f)
-                    ),
-                    startY = y,
-                    endY = size.height
-                ),
-                topLeft = Offset(x - 10f, y - 10f),
-                size = Size(barWidth + 20f, barHeight + 20f)
-            )
-            
-            // Bar
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(color, color.copy(alpha = 0.5f)),
-                    startY = y,
-                    endY = size.height
-                ),
-                topLeft = Offset(x, y),
-                size = Size(barWidth, barHeight)
-            )
-        }
-    }
-}
-
-@Composable
-fun MusicSyncedWave() {
-    val infiniteTransition = rememberInfiniteTransition(label = "wave")
-    val phase = infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "phase"
-    )
-    
-    Canvas(modifier = Modifier
-        .fillMaxSize()
-        .padding(24.dp)
-    ) {
-        val centerY = size.height / 2f
-        val amplitude = size.height * 0.35f
-        val frequency = 3f
-        val pointCount = 200
-        
-        val path = Path().apply {
-            moveTo(0f, centerY)
-            
-            for (i in 0..pointCount) {
-                val x = (i.toFloat() / pointCount) * size.width
-                val radians = ((x / size.width) * frequency * 2 * PI + Math.toRadians(phase.value.toDouble())).toFloat()
-                val y = centerY + sin(radians) * amplitude
-                
-                if (i == 0) {
-                    moveTo(x, y)
-                } else {
-                    lineTo(x, y)
-                }
-            }
-        }
-        
-        drawPath(
-            path = path,
-            brush = Brush.horizontalGradient(
-                colors = listOf(VoidCyan.copy(alpha = 0.4f), VoidPink.copy(alpha = 0.4f))
-            ),
-            style = Stroke(width = 16f, cap = StrokeCap.Round)
-        )
-        
-        drawPath(
-            path = path,
-            brush = Brush.horizontalGradient(
-                colors = listOf(VoidCyan, VoidPurple, VoidPink)
-            ),
-            style = Stroke(width = 5f, cap = StrokeCap.Round)
-        )
-    }
-}
-
-@Composable
-fun StarfieldCosmos() {
-    // Starfield with twinkling and music-synced explosions
+fun CosmosVisualizer(
+    spectrum: FloatArray,
+    modifier: Modifier = Modifier
+) {
+    // EPIC: 800 stars instead of 150
     val stars = remember {
-        List(150) {
+        List(800) {
             Star(
                 x = Random.nextFloat(),
                 y = Random.nextFloat(),
-                size = Random.nextFloat() * 3f + 1f,
-                brightness = Random.nextFloat(),
-                twinkleSpeed = Random.nextFloat() * 2000f + 1000f,
-                type = when (Random.nextInt(10)) {
-                    0 -> StarType.GALAXY
-                    in 1..2 -> StarType.LARGE
-                    else -> StarType.NORMAL
-                }
+                size = Random.nextFloat() * 2f + 0.5f,
+                speed = Random.nextFloat() * 0.0005f + 0.0001f,
+                depth = Random.nextFloat()
             )
         }
     }
     
-    val infiniteTransition = rememberInfiniteTransition(label = "starfield")
+    val nebulae = remember {
+        List(5) {
+            Nebula(
+                x = Random.nextFloat(),
+                y = Random.nextFloat(),
+                radius = Random.nextFloat() * 0.3f + 0.2f,
+                hue = Random.nextFloat() * 360f
+            )
+        }
+    }
     
-    // Music beat simulation
-    val beatPulse = infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "beat"
-    )
+    var time by remember { mutableStateOf(0f) }
+    val bass = spectrum.take(2).average().toFloat()
+    val treble = spectrum.slice(7..9).average().toFloat()
     
-    Canvas(modifier = Modifier.fillMaxSize()) {
+    var supernovaIntensity by remember { mutableStateOf(0f) }
+    val shootingStars = remember { mutableStateListOf<ShootingStar>() }
+    
+    LaunchedEffect(bass) {
+        if (bass > 0.7f && Random.nextFloat() > 0.95f) {
+            supernovaIntensity = 1f
+            while (supernovaIntensity > 0f) {
+                delay(16)
+                supernovaIntensity = (supernovaIntensity - 0.05f).coerceAtLeast(0f)
+            }
+        }
+    }
+    
+    LaunchedEffect(treble) {
+        if (treble > 0.6f && Random.nextFloat() > 0.9f) {
+            shootingStars.add(
+                ShootingStar(
+                    x = Random.nextFloat(),
+                    y = Random.nextFloat() * 0.3f,
+                    vx = Random.nextFloat() * 0.002f + 0.001f,
+                    vy = Random.nextFloat() * 0.001f + 0.0005f,
+                    life = 1f
+                )
+            )
+        }
+    }
+    
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(16)
+            time += 0.016f
+            shootingStars.removeAll { it.life <= 0f }
+            shootingStars.forEach {
+                it.x += it.vx
+                it.y += it.vy
+                it.life -= 0.02f
+            }
+        }
+    }
+    
+    Canvas(modifier = modifier.fillMaxSize()) {
+        // NEBULA CLOUDS
+        nebulae.forEach { nebula ->
+            val centerX = nebula.x * size.width
+            val centerY = nebula.y * size.height
+            val radius = nebula.radius * size.width
+            
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color.hsv(nebula.hue, 0.7f, 0.3f).copy(alpha = 0.3f),
+                        Color.Transparent
+                    ),
+                    center = Offset(centerX, centerY),
+                    radius = radius
+                ),
+                radius = radius,
+                center = Offset(centerX, centerY)
+            )
+        }
+        
+        // BASS SHOCKWAVE
+        if (bass > 0.5f) {
+            val ringRadius = (bass * size.width * 0.5f).coerceAtMost(size.width)
+            drawCircle(
+                color = VoidCyan.copy(alpha = bass * 0.2f),
+                radius = ringRadius,
+                center = Offset(size.width / 2, size.height / 2),
+                style = Stroke(width = 3f)
+            )
+        }
+        
+        // STARS with parallax depth
         stars.forEach { star ->
-            val x = star.x * size.width
+            val offsetX = (time * star.speed * star.depth * size.width) % size.width
+            val x = (star.x * size.width + offsetX) % size.width
             val y = star.y * size.height
             
-            // Twinkle effect
-            val alpha = (sin(System.currentTimeMillis() / star.twinkleSpeed) * 0.5f + 0.5f) * star.brightness
+            val twinkle = 0.3f + spectrum.getOrNull((star.x * 10).toInt() % 10)?.times(0.7f) ?: 0f
+            val alpha = twinkle * (0.5f + star.depth * 0.5f)
+            val visualSize = star.size * (0.5f + star.depth * 1.5f)
             
-            when (star.type) {
-                StarType.NORMAL -> {
-                    // Regular star
-                    drawCircle(
-                        color = Color.White.copy(alpha = alpha * 0.3f),
-                        radius = star.size * 2f,
-                        center = Offset(x, y)
-                    )
-                    drawCircle(
-                        color = Color.White.copy(alpha = alpha),
-                        radius = star.size,
-                        center = Offset(x, y)
-                    )
-                }
+            drawCircle(
+                color = Color.White.copy(alpha = alpha),
+                radius = visualSize,
+                center = Offset(x, y)
+            )
+        }
+        
+        // SHOOTING STARS
+        shootingStars.forEach { star ->
+            val x = star.x * size.width
+            val y = star.y * size.height
+            val tailLength = 40f
+            
+            drawLine(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = star.life),
+                        Color.Transparent
+                    ),
+                    start = Offset(x, y),
+                    end = Offset(x - star.vx * tailLength * 1000, y - star.vy * tailLength * 1000)
+                ),
+                start = Offset(x, y),
+                end = Offset(x - star.vx * tailLength * 1000, y - star.vy * tailLength * 1000),
+                strokeWidth = 2f,
+                cap = StrokeCap.Round
+            )
+        }
+        
+        // SUPERNOVA FLASH
+        if (supernovaIntensity > 0f) {
+            drawRect(
+                color = Color.White.copy(alpha = supernovaIntensity * 0.6f),
+                size = size
+            )
+        }
+    }
+}
+
+// ============================================================================
+// MORPH - Album Art with Vertex Warping
+// ============================================================================
+@Composable
+fun MorphVisualizer(
+    spectrum: FloatArray,
+    albumArtUri: android.net.Uri?,
+    modifier: Modifier = Modifier
+) {
+    val painter = rememberAsyncImagePainter(albumArtUri)
+    
+    var time by remember { mutableStateOf(0f) }
+    val bass = spectrum.take(2).average().toFloat()
+    val mids = spectrum.slice(3..6).average().toFloat()
+    val treble = spectrum.slice(7..9).average().toFloat()
+    
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(16)
+            time += 0.016f
+        }
+    }
+    
+    Box(modifier = modifier.fillMaxSize()) {
+        // Album art base layer
+        Image(
+            painter = painter,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            alpha = 0.3f
+        )
+        
+        // Morphing geometric overlay
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val centerX = size.width / 2
+            val centerY = size.height / 2
+            val baseRadius = minOf(size.width, size.height) * 0.3f
+            
+            // Circle that morphs with bass
+            val circleCount = 6
+            repeat(circleCount) { i ->
+                val angle = (i.toFloat() / circleCount) * 2f * PI.toFloat() + time
+                val radius = baseRadius * (1f + bass * 0.3f)
                 
-                StarType.LARGE -> {
-                    // Larger colored star
-                    val starColor = listOf(VoidCyan, VoidPink, VoidPurple).random()
-                    drawCircle(
-                        color = starColor.copy(alpha = alpha * 0.2f),
-                        radius = star.size * 4f,
-                        center = Offset(x, y)
-                    )
-                    drawCircle(
-                        color = starColor.copy(alpha = alpha),
-                        radius = star.size * 1.5f,
-                        center = Offset(x, y)
-                    )
-                }
+                // Warp offset based on mids
+                val warpX = cos(angle + mids * PI.toFloat()) * mids * 50f
+                val warpY = sin(angle + mids * PI.toFloat()) * mids * 50f
                 
-                StarType.GALAXY -> {
-                    // Galaxy with music-synced pulse/explosion
-                    val pulseSize = star.size * (3f + beatPulse.value * 4f)
+                val x = centerX + cos(angle) * radius + warpX
+                val y = centerY + sin(angle) * radius + warpY
+                
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            VoidCyan.copy(alpha = 0.3f + treble * 0.3f),
+                            Color.Transparent
+                        )
+                    ),
+                    radius = 40f + bass * 60f,
+                    center = Offset(x, y)
+                )
+            }
+            
+            // Triangular warp grid
+            val gridSize = 8
+            for (row in 0 until gridSize) {
+                for (col in 0 until gridSize) {
+                    val x = (col.toFloat() / gridSize) * size.width
+                    val y = (row.toFloat() / gridSize) * size.height
                     
-                    // Outer glow (explosion effect on beat)
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                VoidPink.copy(alpha = alpha * beatPulse.value * 0.3f),
-                                Color.Transparent
-                            ),
-                            center = Offset(x, y),
-                            radius = pulseSize * 3f
-                        ),
-                        radius = pulseSize * 3f,
-                        center = Offset(x, y)
-                    )
+                    // Bass warps vertices
+                    val warpAmount = bass * 30f
+                    val warpX = sin(time + row * 0.5f) * warpAmount
+                    val warpY = cos(time + col * 0.5f) * warpAmount
                     
-                    // Galaxy core
                     drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                VoidCyan.copy(alpha = alpha),
-                                VoidPurple.copy(alpha = alpha * 0.5f),
-                                Color.Transparent
-                            )
-                        ),
-                        radius = pulseSize,
-                        center = Offset(x, y)
-                    )
-                    
-                    // Center bright spot
-                    drawCircle(
-                        color = Color.White.copy(alpha = alpha),
-                        radius = star.size,
-                        center = Offset(x, y)
+                        color = VoidPurple.copy(alpha = 0.1f + mids * 0.2f),
+                        radius = 2f + treble * 4f,
+                        center = Offset(x + warpX, y + warpY)
                     )
                 }
             }
@@ -382,121 +353,228 @@ fun StarfieldCosmos() {
     }
 }
 
+// ============================================================================
+// PULSE - Beat-Reactive Concentric Rings
+// ============================================================================
+@Composable
+fun PulseVisualizer(
+    spectrum: FloatArray,
+    modifier: Modifier = Modifier
+) {
+    val pulses = remember { mutableStateListOf<Pulse>() }
+    val bass = spectrum.take(2).average().toFloat()
+    var lastBeatTime by remember { mutableStateOf(0L) }
+    
+    LaunchedEffect(bass) {
+        val currentTime = System.currentTimeMillis()
+        if (bass > 0.6f && (currentTime - lastBeatTime) > 200) {
+            pulses.add(
+                Pulse(
+                    radius = 0f,
+                    maxRadius = 1.5f,
+                    alpha = 1f,
+                    speed = 0.01f + bass * 0.02f,
+                    color = when {
+                        bass > 0.8f -> VoidPink
+                        bass > 0.7f -> VoidCyan
+                        else -> VoidPurple
+                    }
+                )
+            )
+            lastBeatTime = currentTime
+        }
+    }
+    
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(16)
+            pulses.removeAll { it.alpha <= 0f }
+            pulses.forEach { pulse ->
+                pulse.radius += pulse.speed
+                pulse.alpha = 1f - (pulse.radius / pulse.maxRadius)
+            }
+        }
+    }
+    
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val centerX = size.width / 2
+        val centerY = size.height / 2
+        val maxDimension = maxOf(size.width, size.height)
+        
+        val glowIntensity = spectrum.average().toFloat()
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    VoidCyan.copy(alpha = glowIntensity * 0.3f),
+                    Color.Transparent
+                ),
+                center = Offset(centerX, centerY),
+                radius = maxDimension * 0.5f
+            ),
+            radius = maxDimension * 0.5f,
+            center = Offset(centerX, centerY)
+        )
+        
+        pulses.forEach { pulse ->
+            val radius = pulse.radius * maxDimension
+            drawCircle(
+                color = pulse.color.copy(alpha = pulse.alpha * 0.8f),
+                radius = radius,
+                center = Offset(centerX, centerY),
+                style = Stroke(width = 4.dp.toPx())
+            )
+        }
+        
+        drawCircle(
+            color = VoidCyan.copy(alpha = 0.8f + bass * 0.2f),
+            radius = 8.dp.toPx() * (1f + bass * 0.5f),
+            center = Offset(centerX, centerY)
+        )
+    }
+}
+
+// ============================================================================
+// PARTICLES - 3D Swirling Particle Field
+// ============================================================================
+@Composable
+fun ParticlesVisualizer(
+    spectrum: FloatArray,
+    modifier: Modifier = Modifier
+) {
+    val particles = remember {
+        List(200) {
+            Particle(
+                x = Random.nextFloat() * 2f - 1f,
+                y = Random.nextFloat() * 2f - 1f,
+                z = Random.nextFloat() * 2f - 1f,
+                vx = (Random.nextFloat() - 0.5f) * 0.002f,
+                vy = (Random.nextFloat() - 0.5f) * 0.002f,
+                vz = (Random.nextFloat() - 0.5f) * 0.002f,
+                size = Random.nextFloat() * 3f + 1f,
+                hue = Random.nextFloat() * 360f
+            )
+        }
+    }
+    
+    var rotationAngle by remember { mutableStateOf(0f) }
+    val bass = spectrum.take(2).average().toFloat()
+    val mids = spectrum.slice(3..6).average().toFloat()
+    val treble = spectrum.slice(7..9).average().toFloat()
+    var explosionForce by remember { mutableStateOf(0f) }
+    
+    LaunchedEffect(bass) {
+        if (bass > 0.8f) {
+            explosionForce = 0.05f
+        }
+    }
+    
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(16)
+            rotationAngle += 0.01f + mids * 0.02f
+            
+            if (explosionForce > 0f) {
+                explosionForce *= 0.95f
+            }
+            
+            particles.forEach { p ->
+                val angle = rotationAngle + p.z * 0.1f
+                val cos = cos(angle)
+                val sin = sin(angle)
+                
+                val newX = p.x * cos - p.y * sin
+                val newY = p.x * sin + p.y * cos
+                
+                p.x = newX + p.vx
+                p.y = newY + p.vy
+                p.z += p.vz
+                
+                if (explosionForce > 0f) {
+                    val dist = sqrt(p.x * p.x + p.y * p.y + p.z * p.z)
+                    if (dist > 0.1f) {
+                        p.x += (p.x / dist) * explosionForce
+                        p.y += (p.y / dist) * explosionForce
+                        p.z += (p.z / dist) * explosionForce
+                    }
+                }
+                
+                if (p.x < -1.5f) p.x = 1.5f
+                if (p.x > 1.5f) p.x = -1.5f
+                if (p.y < -1.5f) p.y = 1.5f
+                if (p.y > 1.5f) p.y = -1.5f
+                if (p.z < -1.5f) p.z = 1.5f
+                if (p.z > 1.5f) p.z = -1.5f
+            }
+        }
+    }
+    
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val centerX = size.width / 2
+        val centerY = size.height / 2
+        val scale = minOf(size.width, size.height) * 0.3f
+        
+        val sortedParticles = particles.sortedBy { it.z }
+        
+        sortedParticles.forEach { p ->
+            val perspective = 1f / (1f + p.z * 0.5f)
+            val screenX = centerX + p.x * scale * perspective
+            val screenY = centerY + p.y * scale * perspective
+            
+            val visualSize = p.size * perspective * (0.5f + treble * 0.5f)
+            val hueShift = spectrum.average().toFloat() * 60f
+            val color = Color.hsv((p.hue + hueShift) % 360f, 0.8f, 1f)
+            val alpha = (0.3f + perspective * 0.7f) * (0.5f + mids * 0.5f)
+            
+            drawCircle(
+                color = color.copy(alpha = alpha),
+                radius = visualSize,
+                center = Offset(screenX, screenY)
+            )
+        }
+    }
+}
+
+// ============================================================================
+// DATA CLASSES
+// ============================================================================
 data class Star(
     val x: Float,
     val y: Float,
     val size: Float,
-    val brightness: Float,
-    val twinkleSpeed: Float,
-    val type: StarType
+    val speed: Float,
+    val depth: Float
 )
 
-enum class StarType {
-    NORMAL, LARGE, GALAXY
-}
+data class Nebula(
+    val x: Float,
+    val y: Float,
+    val radius: Float,
+    val hue: Float
+)
 
-@Composable
-fun AlbumArtMorph(albumArtUri: android.net.Uri?) {
-    // Morph album art into geometric shapes
-    val infiniteTransition = rememberInfiniteTransition(label = "morph")
-    
-    val morphProgress = infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 4000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "morph"
-    )
-    
-    val rotation = infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 10000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rotation"
-    )
-    
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (albumArtUri != null) {
-            // Album art layer
-            Image(
-                painter = rememberAsyncImagePainter(albumArtUri),
-                contentDescription = "Album Art",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        alpha = 1f - morphProgress.value * 0.7f
-                        rotationZ = rotation.value * 0.2f
-                        scaleX = 1f + morphProgress.value * 0.3f
-                        scaleY = 1f + morphProgress.value * 0.3f
-                },
-                contentScale = ContentScale.Crop
-            )
-        }
-        
-        // Geometric shape overlay
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val centerX = size.width / 2f
-            val centerY = size.height / 2f
-            val baseRadius = min(size.width, size.height) * 0.35f
-            
-            // Morphing shapes
-            val shapeCount = 3
-            for (i in 0 until shapeCount) {
-                val shapeRotation = rotation.value + (i * 120f)
-                val sides = 3 + i
-                val radius = baseRadius * (0.7f + morphProgress.value * 0.6f) * (1f - i * 0.2f)
-                
-                val path = Path().apply {
-                    for (j in 0..sides) {
-                        val angle = (j.toFloat() / sides) * 2 * PI + Math.toRadians(shapeRotation.toDouble())
-                        val r = radius * (1f + sin(angle * (2 + i)).toFloat() * 0.2f * morphProgress.value)
-                        
-                        val x = centerX + cos(angle).toFloat() * r
-                        val y = centerY + sin(angle).toFloat() * r
-                        
-                        if (j == 0) {
-                            moveTo(x, y)
-                        } else {
-                            lineTo(x, y)
-                        }
-                    }
-                    close()
-                }
-                
-                val shapeColor = when (i) {
-                    0 -> VoidCyan
-                    1 -> VoidPink
-                    else -> VoidPurple
-                }
-                
-                // Outer glow
-                drawPath(
-                    path = path,
-                    color = shapeColor.copy(alpha = 0.1f * morphProgress.value),
-                    style = Stroke(width = 30f)
-                )
-                
-                // Main stroke
-                drawPath(
-                    path = path,
-                    color = shapeColor.copy(alpha = 0.7f * morphProgress.value),
-                    style = Stroke(width = 4f, cap = StrokeCap.Round)
-                )
-            }
-        }
-    }
-}
+data class ShootingStar(
+    var x: Float,
+    var y: Float,
+    val vx: Float,
+    val vy: Float,
+    var life: Float
+)
 
-fun getModeDescription(mode: VisualizerMode): String {
-    return when (mode) {
-        VisualizerMode.SPECTRUM -> "Real-time 10-band frequency spectrum. Bass = Pink, Mids = Cyan, Treble = Purple. Synced to music."
-        VisualizerMode.WAVE -> "Oscilloscope waveform flowing with the music's rhythm and dynamics."
-        VisualizerMode.COSMOS -> "150-star starfield with twinkling stars and galaxies that pulse and explode to the beat."
-        VisualizerMode.MORPH -> "Album artwork morphing into geometric shapes that rotate and pulse with the music."
-    }
-}
+data class Pulse(
+    var radius: Float,
+    val maxRadius: Float,
+    var alpha: Float,
+    val speed: Float,
+    val color: Color
+)
+
+data class Particle(
+    var x: Float,
+    var y: Float,
+    var z: Float,
+    val vx: Float,
+    val vy: Float,
+    val vz: Float,
+    val size: Float,
+    val hue: Float
+)
