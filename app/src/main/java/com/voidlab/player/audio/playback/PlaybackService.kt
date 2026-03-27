@@ -1,8 +1,5 @@
 package com.voidlab.player.audio.playback
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -10,142 +7,122 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
-import android.os.IBinder
-import androidx.annotation.OptIn
-import androidx.lifecycle.LifecycleService
-import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import com.voidlab.player.MainActivity
-import com.voidlab.player.R
 import com.voidlab.player.VoidLabApp
+import com.voidlab.player.audio.analysis.AutoEQLearner
 import com.voidlab.player.audio.analysis.FrequencyAnalyzer
-import com.voidlab.player.data.models.Song
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import com.voidlab.player.audio.effects.EqualizerEngine
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-class PlaybackService : LifecycleService() {
+class PlaybackService : MediaSessionService() {
     
-    private lateinit var player: ExoPlayer
-    private lateinit var mediaSession: MediaSession
+    private var mediaSession: MediaSession? = null
+    private var player: ExoPlayer? = null
+    private var equalizerEngine: EqualizerEngine? = null
+    private var frequencyAnalyzer: FrequencyAnalyzer? = null
+    private var autoEQLearner: AutoEQLearner? = null
+    
     private lateinit var audioManager: AudioManager
     private var audioFocusRequest: AudioFocusRequest? = null
     
-    // FrequencyAnalyzer for real-time spectrum
-    private var frequencyAnalyzer: FrequencyAnalyzer? = null
-    
-    private val _currentSong = MutableStateFlow<Song?>(null)
-    val currentSong: StateFlow<Song?> = _currentSong.asStateFlow()
-    
-    private val _isPlaying = MutableStateFlow(false)
-    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
-    
-    private val _currentPosition = MutableStateFlow(0L)
-    val currentPosition: StateFlow<Long> = _currentPosition.asStateFlow()
-    
-    private val _duration = MutableStateFlow(0L)
-    val duration: StateFlow<Long> = _duration.asStateFlow()
+    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
             AudioManager.AUDIOFOCUS_GAIN -> {
-                // Resume playback if we were paused by focus loss
-                if (!_isPlaying.value && player.playWhenReady) {
-                    player.play()
-                }
-                player.volume = 1.0f
+                player?.volume = 1.0f
             }
             AudioManager.AUDIOFOCUS_LOSS -> {
-                // Permanent loss - stop playback
-                player.pause()
+                player?.pause()
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                // Temporary loss (e.g., phone call) - pause
-                if (player.isPlaying) {
-                    player.pause()
-                }
+                player?.pause()
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                // Lower volume but keep playing (e.g., notification sound)
-                if (player.isPlaying) {
-                    player.volume = 0.3f
-                }
+                player?.volume = 0.3f
             }
         }
     }
     
-    @OptIn(UnstableApi::class)
+    private val playerListener = object : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            mediaItem?.mediaId?.toLongOrNull()?.let { songId ->
+                serviceScope.launch {
+                    loadAndApplyEQProfile(songId)
+                }
+            }
+        }
+        
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) {
+                // Get REAL audio session from ExoPlayer
+                player?.audioSessionId?.let { realSessionId ->
+                    // Re-initialize FrequencyAnalyzer with REAL session ID if needed
+                    if (frequencyAnalyzer == null || frequencyAnalyzer?.audioSessionId != realSessionId) {
+                        frequencyAnalyzer?.stop()
+                        frequencyAnalyzer = FrequencyAnalyzer(realSessionId)
+                    }
+                    frequencyAnalyzer?.start()
+                }
+                requestAudioFocus()
+            } else {
+                frequencyAnalyzer?.stop()
+                abandonAudioFocus()
+            }
+        }
+    }
+    
     override fun onCreate() {
         super.onCreate()
         
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         
-        createNotificationChannel()
-        
         player = ExoPlayer.Builder(this).build().apply {
-            addListener(object : Player.Listener {
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    _isPlaying.value = isPlaying
-                    
-                    if (isPlaying) {
-                        // Get REAL audio session ID from ExoPlayer
-                        val realAudioSessionId = player.audioSessionId
-                        
-                        // Initialize FrequencyAnalyzer with REAL session ID
-                        if (frequencyAnalyzer == null || frequencyAnalyzer?.audioSessionId != realAudioSessionId) {
-                            frequencyAnalyzer?.stop()
-                            frequencyAnalyzer = FrequencyAnalyzer(realAudioSessionId)
-                        }
-                        frequencyAnalyzer?.start()
-                        
-                        requestAudioFocus()
-                    } else {
-                        frequencyAnalyzer?.stop()
-                        abandonAudioFocus()
-                    }
-                    
-                    updateNotification()
-                }
-                
-                override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                    updateCurrentSong()
-                }
-            })
+            addListener(playerListener)
         }
         
-        mediaSession = MediaSession.Builder(this, player)
+        player?.audioSessionId?.let { sessionId ->
+            equalizerEngine = EqualizerEngine(sessionId)
+            frequencyAnalyzer = FrequencyAnalyzer(sessionId)
+            autoEQLearner = AutoEQLearner()
+        }
+        
+        val sessionActivityIntent = Intent(this, MainActivity::class.java)
+        val sessionActivityPendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            sessionActivityIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        // Build MediaSession with proper callback for notification controls
+        mediaSession = MediaSession.Builder(this, player!!)
+            .setSessionActivity(sessionActivityPendingIntent)
             .setCallback(object : MediaSession.Callback {
-                override fun onPlay(session: MediaSession, controller: MediaSession.ControllerInfo) {
-                    player.play()
-                }
-                
-                override fun onPause(session: MediaSession, controller: MediaSession.ControllerInfo) {
-                    player.pause()
-                }
-                
-                override fun onSkipToNext(session: MediaSession, controller: MediaSession.ControllerInfo) {
-                    player.seekToNext()
-                }
-                
-                override fun onSkipToPrevious(session: MediaSession, controller: MediaSession.ControllerInfo) {
-                    player.seekToPrevious()
+                override fun onAddMediaItems(
+                    mediaSession: MediaSession,
+                    controller: MediaSession.ControllerInfo,
+                    mediaItems: List<MediaItem>
+                ): ListenableFuture<List<MediaItem>> {
+                    val updatedMediaItems = mediaItems.map { mediaItem ->
+                        mediaItem.buildUpon()
+                            .setUri(mediaItem.requestMetadata.mediaUri ?: mediaItem.localConfiguration?.uri)
+                            .build()
+                    }
+                    return Futures.immediateFuture(updatedMediaItems)
                 }
             })
             .build()
-        
-        lifecycleScope.launch {
-            while (true) {
-                _currentPosition.value = player.currentPosition
-                _duration.value = player.duration.coerceAtLeast(0)
-                kotlinx.coroutines.delay(100)
-            }
-        }
     }
     
     private fun requestAudioFocus(): Boolean {
@@ -181,120 +158,49 @@ class PlaybackService : LifecycleService() {
         }
     }
     
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Playback",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Media playback controls"
-            }
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            notificationManager.createNotificationChannel(channel)
-        }
-    }
-    
-    private fun updateNotification() {
-        val notification = createNotification()
-        startForeground(NOTIFICATION_ID, notification)
-    }
-    
-    private fun createNotification(): Notification {
-        val intent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        
-        return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle(_currentSong.value?.title ?: "VoidLab")
-            .setContentText(_currentSong.value?.artist ?: "No song playing")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentIntent(pendingIntent)
-            .build()
-    }
-    
-    private fun updateCurrentSong() {
-        val currentMediaItem = player.currentMediaItem
-        if (currentMediaItem != null) {
-            val song = Song(
-                id = currentMediaItem.mediaId.toLongOrNull() ?: 0,
-                title = currentMediaItem.mediaMetadata.title?.toString() ?: "Unknown",
-                artist = currentMediaItem.mediaMetadata.artist?.toString() ?: "Unknown",
-                album = currentMediaItem.mediaMetadata.albumTitle?.toString() ?: "Unknown",
-                duration = player.duration,
-                data = "",
-                albumId = 0
-            )
-            _currentSong.value = song
-            updateNotification()
-        }
-    }
-    
-    fun playSong(song: Song) {
-        val mediaItem = MediaItem.Builder()
-            .setMediaId(song.id.toString())
-            .setUri(song.data)
-            .build()
-        
-        player.setMediaItem(mediaItem)
-        player.prepare()
-        player.play()
-        
-        _currentSong.value = song
-    }
-    
-    fun playPlaylist(songs: List<Song>, startIndex: Int = 0) {
-        val mediaItems = songs.map { song ->
-            MediaItem.Builder()
-                .setMediaId(song.id.toString())
-                .setUri(song.data)
-                .build()
-        }
-        
-        player.setMediaItems(mediaItems, startIndex, 0)
-        player.prepare()
-        player.play()
-        
-        _currentSong.value = songs.getOrNull(startIndex)
-    }
-    
-    fun togglePlayPause() {
-        if (player.isPlaying) {
-            player.pause()
-        } else {
-            player.play()
-        }
-    }
-    
-    fun seekTo(position: Long) {
-        player.seekTo(position)
-    }
-    
-    fun skipToNext() {
-        player.seekToNext()
-    }
-    
-    fun skipToPrevious() {
-        player.seekToPrevious()
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+        return mediaSession
     }
     
     override fun onDestroy() {
-        frequencyAnalyzer?.stop()
         abandonAudioFocus()
-        player.release()
-        mediaSession.release()
+        mediaSession?.run {
+            player.release()
+            release()
+            mediaSession = null
+        }
+        equalizerEngine?.release()
+        frequencyAnalyzer?.stop()
+        player = null
         super.onDestroy()
     }
     
-    override fun onBind(intent: Intent): IBinder? {
-        super.onBind(intent)
-        return PlaybackServiceBinder(this)
-    }
-    
-    companion object {
-        private const val CHANNEL_ID = "playback_channel"
-        private const val NOTIFICATION_ID = 1
+    private suspend fun loadAndApplyEQProfile(songId: Long) {
+        // Get repositories from Application
+        val app = application as VoidLabApp
+        val eqRepository = app.eqRepository
+        val musicRepository = app.musicRepository
+        
+        val profile = eqRepository.getProfileForSong(songId)
+        val song = musicRepository.findSongById(songId)
+        
+        if (profile != null && profile.isAutoLearned) {
+            // Apply existing learned profile
+            equalizerEngine?.applyProfile(profile)
+        } else if (song != null) {
+            // Start Auto EQ learning
+            frequencyAnalyzer?.start()
+            autoEQLearner?.startLearning(
+                analyzer = frequencyAnalyzer!!,
+                songId = songId,
+                songTitle = song.title,
+                songArtist = song.artist
+            ) { learnedProfile ->
+                serviceScope.launch {
+                    eqRepository.saveProfile(learnedProfile)
+                    equalizerEngine?.applyProfile(learnedProfile)
+                }
+            }
+        }
     }
 }
