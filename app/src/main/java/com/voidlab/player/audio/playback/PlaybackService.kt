@@ -19,18 +19,24 @@ import com.voidlab.player.VoidLabApp
 import com.voidlab.player.audio.analysis.AutoEQLearner
 import com.voidlab.player.audio.analysis.FrequencyAnalyzer
 import com.voidlab.player.audio.effects.EqualizerEngine
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class PlaybackService : MediaSessionService() {
     
     private var mediaSession: MediaSession? = null
     private var player: ExoPlayer? = null
     private var equalizerEngine: EqualizerEngine? = null
-    private var frequencyAnalyzer: FrequencyAnalyzer? = null
     private var autoEQLearner: AutoEQLearner? = null
+    
+    // INJECTED SINGLETON - shared with ViewModels!
+    @Inject
+    lateinit var frequencyAnalyzer: FrequencyAnalyzer
     
     private lateinit var audioManager: AudioManager
     private var audioFocusRequest: AudioFocusRequest? = null
@@ -67,16 +73,13 @@ class PlaybackService : MediaSessionService() {
             if (isPlaying) {
                 // Get REAL audio session from ExoPlayer
                 player?.audioSessionId?.let { realSessionId ->
-                    // Re-initialize FrequencyAnalyzer with REAL session ID if needed
-                    if (frequencyAnalyzer == null || frequencyAnalyzer?.audioSessionId != realSessionId) {
-                        frequencyAnalyzer?.stop()
-                        frequencyAnalyzer = FrequencyAnalyzer(realSessionId)
-                    }
-                    frequencyAnalyzer?.start()
+                    // Update the INJECTED singleton with real session!
+                    frequencyAnalyzer.updateAudioSession(realSessionId)
+                    frequencyAnalyzer.start()
                 }
                 requestAudioFocus()
             } else {
-                frequencyAnalyzer?.stop()
+                frequencyAnalyzer.stop()
                 abandonAudioFocus()
             }
         }
@@ -93,7 +96,8 @@ class PlaybackService : MediaSessionService() {
         
         player?.audioSessionId?.let { sessionId ->
             equalizerEngine = EqualizerEngine(sessionId)
-            frequencyAnalyzer = FrequencyAnalyzer(sessionId)
+            // Update the INJECTED frequencyAnalyzer with real session
+            frequencyAnalyzer.updateAudioSession(sessionId)
             autoEQLearner = AutoEQLearner()
         }
         
@@ -170,7 +174,7 @@ class PlaybackService : MediaSessionService() {
             mediaSession = null
         }
         equalizerEngine?.release()
-        frequencyAnalyzer?.stop()
+        frequencyAnalyzer.stop()
         player = null
         super.onDestroy()
     }
@@ -189,9 +193,9 @@ class PlaybackService : MediaSessionService() {
             equalizerEngine?.applyProfile(profile)
         } else if (song != null) {
             // Start Auto EQ learning
-            frequencyAnalyzer?.start()
+            frequencyAnalyzer.start()
             autoEQLearner?.startLearning(
-                analyzer = frequencyAnalyzer!!,
+                analyzer = frequencyAnalyzer,
                 songId = songId,
                 songTitle = song.title,
                 songArtist = song.artist
