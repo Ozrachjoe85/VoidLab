@@ -4,18 +4,35 @@ import android.media.audiofx.Visualizer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.math.log10
 import kotlin.math.sqrt
 
-class FrequencyAnalyzer(val audioSessionId: Int) {
+@Singleton
+class FrequencyAnalyzer @Inject constructor() {
     
     private var visualizer: Visualizer? = null
     private val snapshots = mutableListOf<FloatArray>()
+    private var audioSessionId: Int = 0
     
     private val _currentSpectrum = MutableStateFlow(FloatArray(10))
     val currentSpectrum: StateFlow<FloatArray> = _currentSpectrum.asStateFlow()
     
+    // Called by PlaybackService when it gets the REAL audio session
+    fun updateAudioSession(newSessionId: Int) {
+        if (audioSessionId != newSessionId) {
+            stop()
+            audioSessionId = newSessionId
+        }
+    }
+    
     fun start() {
+        if (audioSessionId == 0) {
+            // Can't start without a valid session
+            return
+        }
+        
         try {
             visualizer = Visualizer(audioSessionId).apply {
                 captureSize = Visualizer.getCaptureSizeRange()[1]
@@ -50,7 +67,6 @@ class FrequencyAnalyzer(val audioSessionId: Int) {
         visualizer?.enabled = false
         visualizer?.release()
         visualizer = null
-        snapshots.clear()
     }
     
     // Public methods for AutoEQLearner
