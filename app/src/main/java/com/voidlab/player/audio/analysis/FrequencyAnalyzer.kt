@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlin.math.log10
 import kotlin.math.sqrt
 
-class FrequencyAnalyzer(val audioSessionId: Int) {  // Changed to val (public) instead of private val
+class FrequencyAnalyzer(val audioSessionId: Int) {
     
     private var visualizer: Visualizer? = null
     private val snapshots = mutableListOf<FloatArray>()
@@ -51,6 +51,15 @@ class FrequencyAnalyzer(val audioSessionId: Int) {  // Changed to val (public) i
         visualizer?.release()
         visualizer = null
         snapshots.clear()
+    }
+    
+    // Public methods for AutoEQLearner
+    fun clearSnapshots() {
+        snapshots.clear()
+    }
+    
+    fun getSnapshots(): List<FloatArray> {
+        return snapshots.toList()
     }
     
     private fun processFft(fft: ByteArray) {
