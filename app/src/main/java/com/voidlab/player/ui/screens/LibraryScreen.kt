@@ -1,11 +1,11 @@
 package com.voidlab.player.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,7 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,142 +48,81 @@ fun LibraryScreen(
             )
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Surface(
+                color = VoidBlackLight,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "LIBRARY",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = VoidCyan,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                // Filter indicator
-                if (showFavoritesOnly) {
-                    Surface(
-                        color = VoidPink.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Favorite,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = VoidPink
-                            )
-                            Text(
-                                text = "Favorites",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = VoidPink,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Search bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { libraryViewModel.setSearchQuery(it) },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = {
-                    Text(
-                        "Search songs, artists, albums...",
-                        color = VoidCyan.copy(alpha = 0.5f)
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.Search,
-                        contentDescription = null,
-                        tint = VoidCyan
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { libraryViewModel.setSearchQuery("") }) {
-                            Icon(
-                                Icons.Default.Clear,
-                                contentDescription = "Clear",
-                                tint = VoidCyan
-                            )
-                        }
-                    }
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = VoidCyan,
-                    unfocusedTextColor = VoidCyan,
-                    focusedBorderColor = VoidCyan,
-                    unfocusedBorderColor = VoidCyan.copy(alpha = 0.3f),
-                    cursorColor = VoidCyan
-                ),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Song count
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (showFavoritesOnly) {
-                        "${songs.size} favorites"
-                    } else {
-                        "${songs.size} songs"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = VoidCyan.copy(alpha = 0.7f)
-                )
-                
-                TextButton(
-                    onClick = { libraryViewModel.refreshLibrary() }
+                Column(
+                    modifier = Modifier.padding(16.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = VoidCyan
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "LIBRARY",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = VoidCyan,
+                            fontWeight = FontWeight.Bold
+                        )
+                        
+                        IconButton(onClick = { showFilterSheet = true }) {
+                            Badge(
+                                containerColor = if (showFavoritesOnly) VoidCyan else VoidCyan.copy(alpha = 0.3f)
+                            ) {
+                                Icon(
+                                    Icons.Default.FilterList,
+                                    contentDescription = "Filter",
+                                    tint = if (showFavoritesOnly) VoidBlack else VoidCyan
+                                )
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { libraryViewModel.setSearchQuery(it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = {
+                            Text("Search songs, artists, albums...", color = VoidCyan.copy(alpha = 0.5f))
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = null, tint = VoidCyan)
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { libraryViewModel.setSearchQuery("") }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = VoidCyan)
+                                }
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = VoidCyan,
+                            unfocusedTextColor = VoidCyan,
+                            focusedBorderColor = VoidCyan,
+                            unfocusedBorderColor = VoidCyan.copy(alpha = 0.3f)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Refresh", color = VoidCyan)
                 }
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Song list
             if (isLoading) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(color = VoidCyan)
                 }
             } else if (songs.isEmpty()) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -191,29 +130,27 @@ fun LibraryScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            if (showFavoritesOnly) Icons.Default.FavoriteBorder else Icons.Default.MusicNote,
+                            Icons.Default.MusicNote,
                             contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = VoidCyan.copy(alpha = 0.5f)
+                            modifier = Modifier.size(64.dp),
+                            tint = VoidCyan.copy(alpha = 0.3f)
                         )
                         Text(
-                            text = if (showFavoritesOnly) {
-                                "No favorites yet"
-                            } else if (searchQuery.isNotEmpty()) {
-                                "No songs found"
-                            } else {
-                                "No songs in library"
-                            },
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = VoidCyan.copy(alpha = 0.7f)
+                            text = if (showFavoritesOnly) "No favorites yet" else "No songs found",
+                            color = VoidCyan.copy(alpha = 0.6f),
+                            style = MaterialTheme.typography.bodyLarge
                         )
+                        if (showFavoritesOnly) {
+                            TextButton(onClick = { libraryViewModel.setShowFavoritesOnly(false) }) {
+                                Text("Show all songs", color = VoidCyan)
+                            }
+                        }
                     }
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(songs, key = { it.id }) { song ->
@@ -228,67 +165,51 @@ fun LibraryScreen(
             }
         }
         
-        // FAB for filter
-        FloatingActionButton(
-            onClick = { showFilterSheet = true },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            containerColor = VoidCyan,
-            contentColor = VoidBlack
-        ) {
-            Icon(
-                if (showFavoritesOnly) Icons.Default.Favorite else Icons.Default.FilterList,
-                contentDescription = "Filter"
-            )
-        }
-    }
-    
-    // Filter bottom sheet
-    if (showFilterSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showFilterSheet = false },
-            containerColor = VoidBlackLight
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
+        if (showFilterSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showFilterSheet = false },
+                containerColor = VoidBlackLight
             ) {
-                Text(
-                    text = "FILTER",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = VoidCyan,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // All Songs option
-                FilterOption(
-                    label = "All Songs",
-                    icon = Icons.Default.MusicNote,
-                    isSelected = !showFavoritesOnly,
-                    onClick = {
-                        libraryViewModel.setShowFavoritesOnly(false)
-                        showFilterSheet = false
-                    }
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // Favorites option
-                FilterOption(
-                    label = "Favorites Only",
-                    icon = Icons.Default.Favorite,
-                    isSelected = showFavoritesOnly,
-                    onClick = {
-                        libraryViewModel.setShowFavoritesOnly(true)
-                        showFilterSheet = false
-                    }
-                )
-                
-                Spacer(modifier = Modifier.height(32.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "FILTER",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = VoidCyan,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    FilterOption(
+                        icon = Icons.Default.LibraryMusic,
+                        label = "All Songs",
+                        count = songs.size,
+                        isSelected = !showFavoritesOnly,
+                        onClick = {
+                            libraryViewModel.setShowFavoritesOnly(false)
+                            showFilterSheet = false
+                        }
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    FilterOption(
+                        icon = Icons.Default.Favorite,
+                        label = "Favorites",
+                        count = null,
+                        isSelected = showFavoritesOnly,
+                        onClick = {
+                            libraryViewModel.setShowFavoritesOnly(true)
+                            showFilterSheet = false
+                        }
+                    )
+                    
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
             }
         }
     }
@@ -296,17 +217,17 @@ fun LibraryScreen(
 
 @Composable
 fun FilterOption(
-    label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    count: Int?,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        color = if (isSelected) VoidCyan.copy(alpha = 0.2f) else Color.Transparent,
-        shape = RoundedCornerShape(12.dp)
+        onClick = onClick,
+        color = if (isSelected) VoidCyan.copy(alpha = 0.2f) else VoidBlack,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
@@ -322,39 +243,48 @@ fun FilterOption(
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = if (isSelected) VoidCyan else VoidCyan.copy(alpha = 0.7f)
+                    tint = if (isSelected) VoidCyan else VoidCyan.copy(alpha = 0.6f),
+                    modifier = Modifier.size(24.dp)
                 )
                 Text(
                     text = label,
+                    color = if (isSelected) VoidCyan else VoidCyan.copy(alpha = 0.6f),
                     style = MaterialTheme.typography.bodyLarge,
-                    color = if (isSelected) VoidCyan else VoidCyan.copy(alpha = 0.7f),
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+            
+            if (count != null) {
+                Text(
+                    text = "$count",
+                    color = VoidCyan.copy(alpha = 0.5f),
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
             
             if (isSelected) {
                 Icon(
-                    Icons.Default.CheckCircle,
+                    Icons.Default.Check,
                     contentDescription = null,
-                    tint = VoidCyan
+                    tint = VoidCyan,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongItem(
     song: Song,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onClick: () -> Unit
 ) {
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        onClick = onClick,
         color = VoidBlackLight,
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
@@ -363,49 +293,61 @@ fun SongItem(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Album art
-            AsyncImage(
-                model = song.albumArtUri,
-                contentDescription = null,
+            Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
-            )
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(VoidBlack)
+            ) {
+                if (song.albumArtUri != null) {
+                    AsyncImage(
+                        model = song.albumArtUri,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Album,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp),
+                        tint = VoidCyan.copy(alpha = 0.3f)
+                    )
+                }
+            }
             
-            // Song info
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = song.title,
-                    style = MaterialTheme.typography.bodyLarge,
                     color = VoidCyan,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                
                 Text(
-                    text = song.artist,
+                    text = "${song.artist} • ${song.album}",
+                    color = VoidCyan.copy(alpha = 0.6f),
                     style = MaterialTheme.typography.bodySmall,
-                    color = VoidCyan.copy(alpha = 0.7f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
             
-            // Duration
             Text(
                 text = formatDuration(song.duration),
-                style = MaterialTheme.typography.bodySmall,
-                color = VoidCyan.copy(alpha = 0.5f)
+                color = VoidCyan.copy(alpha = 0.5f),
+                style = MaterialTheme.typography.bodySmall
             )
         }
     }
 }
 
-private fun formatDuration(millis: Long): String {
+fun formatDuration(millis: Long): String {
     val seconds = (millis / 1000) % 60
     val minutes = (millis / (1000 * 60)) % 60
     return String.format("%d:%02d", minutes, seconds)
