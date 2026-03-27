@@ -7,6 +7,7 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
+import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -34,7 +35,6 @@ class PlaybackService : MediaSessionService() {
     private var equalizerEngine: EqualizerEngine? = null
     private var autoEQLearner: AutoEQLearner? = null
     
-    // INJECTED SINGLETON - shared with ViewModels!
     @Inject
     lateinit var frequencyAnalyzer: FrequencyAnalyzer
     
@@ -63,6 +63,7 @@ class PlaybackService : MediaSessionService() {
     private val playerListener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             mediaItem?.mediaId?.toLongOrNull()?.let { songId ->
+                Log.d("PlaybackService", "Media transition to song: $songId")
                 serviceScope.launch {
                     loadAndApplyEQProfile(songId)
                 }
@@ -71,9 +72,8 @@ class PlaybackService : MediaSessionService() {
         
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (isPlaying) {
-                // Get REAL audio session from ExoPlayer
                 player?.audioSessionId?.let { realSessionId ->
-                    // Update the INJECTED singleton with real session!
+                    Log.d("PlaybackService", "Music playing, updating analyzer with session: $realSessionId")
                     frequencyAnalyzer.updateAudioSession(realSessionId)
                     frequencyAnalyzer.start()
                 }
@@ -95,8 +95,8 @@ class PlaybackService : MediaSessionService() {
         }
         
         player?.audioSessionId?.let { sessionId ->
+            Log.d("PlaybackService", "Initializing with audio session: $sessionId")
             equalizerEngine = EqualizerEngine(sessionId)
-            // Update the INJECTED frequencyAnalyzer with real session
             frequencyAnalyzer.updateAudioSession(sessionId)
             autoEQLearner = AutoEQLearner()
         }
@@ -109,7 +109,6 @@ class PlaybackService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
-        // Build MediaSession with proper callback for notification controls
         mediaSession = MediaSession.Builder(this, player!!)
             .setSessionActivity(sessionActivityPendingIntent)
             .setCallback(object : MediaSession.Callback {
@@ -180,31 +179,37 @@ class PlaybackService : MediaSessionService() {
     }
     
     private suspend fun loadAndApplyEQProfile(songId: Long) {
-        // Get repositories from Application
         val app = application as VoidLabApp
         val eqRepository = app.eqRepository
         val musicRepository = app.musicRepository
+        
+        Log.d("AutoEQ", "Loading profile for song: $songId")
         
         val profile = eqRepository.getProfileForSong(songId)
         val song = musicRepository.findSongById(songId)
         
         if (profile != null && profile.isAutoLearned) {
-            // Apply existing learned profile
+            Log.d("AutoEQ", "Applying existing profile: ${profile.songTitle}")
             equalizerEngine?.applyProfile(profile)
         } else if (song != null) {
-            // Start Auto EQ learning
+            Log.d("AutoEQ", "Starting learning for: ${song.title}")
             frequencyAnalyzer.start()
+            
             autoEQLearner?.startLearning(
                 analyzer = frequencyAnalyzer,
                 songId = songId,
                 songTitle = song.title,
                 songArtist = song.artist
             ) { learnedProfile ->
+                Log.d("AutoEQ", "Profile learned! Bands: ${learnedProfile.getBands()}")
                 serviceScope.launch {
                     eqRepository.saveProfile(learnedProfile)
+                    Log.d("AutoEQ", "Profile saved to database")
                     equalizerEngine?.applyProfile(learnedProfile)
                 }
             }
+        } else {
+            Log.w("AutoEQ", "Song not found for ID: $songId")
         }
     }
 }
