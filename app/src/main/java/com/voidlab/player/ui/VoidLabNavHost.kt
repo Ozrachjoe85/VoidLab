@@ -23,7 +23,6 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     object NowPlaying : Screen("now_playing", "NOW PLAYING", Icons.Default.PlayCircle)
     object Library : Screen("library", "LIBRARY", Icons.Default.LibraryMusic)
     object Equalizer : Screen("equalizer", "EQUALIZER", Icons.Default.Tune)
-    object Visualizer : Screen("visualizer", "VISUALIZER", Icons.Default.Waves)
     object Settings : Screen("settings", "SETTINGS", Icons.Default.Settings)
 }
 
@@ -41,7 +40,6 @@ fun VoidLabNavHost() {
         Screen.NowPlaying,
         Screen.Library,
         Screen.Equalizer,
-        Screen.Visualizer,
         Screen.Settings
     )
     
@@ -87,10 +85,6 @@ fun VoidLabNavHost() {
             composable(Screen.Equalizer.route) {
                 val eqViewModel: EQViewModel = hiltViewModel()
                 EqualizerScreen(viewModel = eqViewModel)
-            }
-            
-            composable(Screen.Visualizer.route) {
-                VisualizerScreen(viewModel = playerViewModel)
             }
             
             composable(Screen.Settings.route) {
