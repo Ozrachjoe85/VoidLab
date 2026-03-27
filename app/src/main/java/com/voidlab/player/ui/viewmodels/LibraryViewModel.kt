@@ -3,21 +3,17 @@ package com.voidlab.player.ui.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.voidlab.player.data.models.Song
+import com.voidlab.player.data.repository.FavoriteRepository
 import com.voidlab.player.data.repository.MusicRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class SortMode {
-    TITLE, ARTIST, ALBUM, DATE_ADDED, DURATION
-}
-
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
-    private val musicRepository: MusicRepository
+    private val musicRepository: MusicRepository,
+    private val favoriteRepository: FavoriteRepository
 ) : ViewModel() {
     
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
@@ -26,55 +22,90 @@ class LibraryViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
     
-    private val _sortMode = MutableStateFlow(SortMode.TITLE)
-    val sortMode: StateFlow<SortMode> = _sortMode.asStateFlow()
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    
+    // Filter mode: ALL or FAVORITES
+    private val _showFavoritesOnly = MutableStateFlow(false)
+    val showFavoritesOnly: StateFlow<Boolean> = _showFavoritesOnly.asStateFlow()
+    
+    private val _favoriteIds = MutableStateFlow<Set<Long>>(emptySet())
+    
+    // Filtered songs based on search and favorites
+    val filteredSongs: StateFlow<List<Song>> = combine(
+        _songs,
+        _searchQuery,
+        _showFavoritesOnly,
+        _favoriteIds
+    ) { songs, query, favoritesOnly, favoriteIds ->
+        var filtered = songs
+        
+        // Apply favorites filter first
+        if (favoritesOnly) {
+            filtered = filtered.filter { it.id in favoriteIds }
+        }
+        
+        // Apply search filter
+        if (query.isNotBlank()) {
+            val lowerQuery = query.lowercase()
+            filtered = filtered.filter {
+                it.title.lowercase().contains(lowerQuery) ||
+                it.artist.lowercase().contains(lowerQuery) ||
+                it.album.lowercase().contains(lowerQuery)
+            }
+        }
+        
+        filtered
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
     
     init {
         loadSongs()
+        loadFavorites()
     }
     
     private fun loadSongs() {
         viewModelScope.launch {
-            musicRepository.getAllSongs().collect { songList ->
-                _songs.value = applySortAndFilter(songList)
+            _isLoading.value = true
+            try {
+                musicRepository.getAllSongs().collect { songList ->
+                    _songs.value = songList
+                }
+            } finally {
+                _isLoading.value = false
             }
         }
+    }
+    
+    private fun loadFavorites() {
+        viewModelScope.launch {
+            favoriteRepository.getAllFavorites().collect { favorites ->
+                _favoriteIds.value = favorites.map { it.songId }.toSet()
+            }
+        }
+    }
+    
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
     }
     
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
+    }
+    
+    fun toggleFavoritesFilter() {
+        _showFavoritesOnly.value = !_showFavoritesOnly.value
+    }
+    
+    fun setShowFavoritesOnly(show: Boolean) {
+        _showFavoritesOnly.value = show
+    }
+    
+    fun refreshLibrary() {
         loadSongs()
-    }
-    
-    // ADDED: Alias for LibraryScreen compatibility
-    fun setSearchQuery(query: String) {
-        updateSearchQuery(query)
-    }
-    
-    fun setSortMode(mode: SortMode) {
-        _sortMode.value = mode
-        loadSongs()
-    }
-    
-    private fun applySortAndFilter(songList: List<Song>): List<Song> {
-        var filtered = songList
-        
-        // Apply search filter
-        if (_searchQuery.value.isNotEmpty()) {
-            filtered = filtered.filter { song ->
-                song.title.contains(_searchQuery.value, ignoreCase = true) ||
-                song.artist.contains(_searchQuery.value, ignoreCase = true) ||
-                song.album.contains(_searchQuery.value, ignoreCase = true)
-            }
-        }
-        
-        // Apply sorting
-        return when (_sortMode.value) {
-            SortMode.TITLE -> filtered.sortedBy { it.title }
-            SortMode.ARTIST -> filtered.sortedBy { it.artist }
-            SortMode.ALBUM -> filtered.sortedBy { it.album }
-            SortMode.DATE_ADDED -> filtered.sortedByDescending { it.dateAdded }
-            SortMode.DURATION -> filtered.sortedByDescending { it.duration }
-        }
+        loadFavorites()
     }
 }
