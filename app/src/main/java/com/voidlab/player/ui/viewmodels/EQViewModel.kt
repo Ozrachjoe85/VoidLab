@@ -36,11 +36,15 @@ class EQViewModel @Inject constructor(
     private val _learnedProfileCount = MutableStateFlow(0)
     val learnedProfileCount: StateFlow<Int> = _learnedProfileCount.asStateFlow()
     
-    // REAL-TIME SPECTRUM
+    // REAL-TIME SPECTRUM - Makes EQ ALIVE!
     val currentSpectrum = frequencyAnalyzer.currentSpectrum
     
-    // Use existing enum values
-    val presets = EQPreset.values().toList()
+    val presets = listOf(
+        EQPreset.FLAT,
+        EQPreset.BASS_BOOST,
+        EQPreset.TREBLE_BOOST,
+        EQPreset.VOCAL
+    )
     
     init {
         loadDefaultProfile()
@@ -49,6 +53,7 @@ class EQViewModel @Inject constructor(
     
     private fun loadDefaultProfile() {
         viewModelScope.launch {
+            // Start with flat profile
             _currentProfile.value = EQProfile(
                 songId = 0,
                 songTitle = "Default",
@@ -70,15 +75,9 @@ class EQViewModel @Inject constructor(
     
     private fun loadLearnedProfiles() {
         viewModelScope.launch {
-            try {
-                eqRepository.getAllLearnedProfiles().collect { profiles ->
-                    _learnedProfiles.value = profiles
-                    _learnedProfileCount.value = profiles.size
-                }
-            } catch (e: Exception) {
-                // Method might not exist, skip learned profiles tracking
-                _learnedProfiles.value = emptyList()
-                _learnedProfileCount.value = 0
+            eqRepository.getAllProfiles().collect { profiles ->
+                _learnedProfiles.value = profiles
+                _learnedProfileCount.value = profiles.size
             }
         }
     }
@@ -111,21 +110,24 @@ class EQViewModel @Inject constructor(
         _currentProfile.value = updated
     }
     
+    // FIXED: Create new EQProfile with preset values
     fun applyPreset(preset: EQPreset) {
         val current = _currentProfile.value ?: return
-        val bands = preset.getBands()
         
-        val updated = current.copy(
-            band31Hz = bands[0],
-            band62Hz = bands[1],
-            band125Hz = bands[2],
-            band250Hz = bands[3],
-            band500Hz = bands[4],
-            band1kHz = bands[5],
-            band2kHz = bands[6],
-            band4kHz = bands[7],
-            band8kHz = bands[8],
-            band16kHz = bands[9],
+        val updated = EQProfile(
+            songId = current.songId,
+            songTitle = current.songTitle,
+            songArtist = current.songArtist,
+            band31Hz = preset.band31Hz,
+            band62Hz = preset.band62Hz,
+            band125Hz = preset.band125Hz,
+            band250Hz = preset.band250Hz,
+            band500Hz = preset.band500Hz,
+            band1kHz = preset.band1kHz,
+            band2kHz = preset.band2kHz,
+            band4kHz = preset.band4kHz,
+            band8kHz = preset.band8kHz,
+            band16kHz = preset.band16kHz,
             isAutoLearned = false
         )
         
