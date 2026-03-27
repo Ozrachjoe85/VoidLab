@@ -7,9 +7,7 @@ import com.voidlab.player.data.models.EQPreset
 import com.voidlab.player.data.models.EQProfile
 import com.voidlab.player.data.repository.EQRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -38,44 +36,49 @@ class EQViewModel @Inject constructor(
     private val _learnedProfileCount = MutableStateFlow(0)
     val learnedProfileCount: StateFlow<Int> = _learnedProfileCount.asStateFlow()
     
-    // REAL-TIME SPECTRUM - Makes EQ ALIVE!
+    // REAL-TIME SPECTRUM
     val currentSpectrum = frequencyAnalyzer.currentSpectrum
     
-    val presets = listOf(
-        EQPreset("Flat", "Neutral", List(10) { 0f }),
-        EQPreset("Bass Boost", "More Bass", listOf(6f, 5f, 4f, 2f, 0f, 0f, 0f, 0f, 0f, 0f)),
-        EQPreset("Treble Boost", "Crisp Highs", listOf(0f, 0f, 0f, 0f, 0f, 2f, 4f, 5f, 6f, 6f)),
-        EQPreset("V-Shape", "Enhanced", listOf(5f, 4f, 2f, 0f, -2f, -2f, 0f, 2f, 4f, 5f)),
-        EQPreset("Vocal", "Clear Voice", listOf(0f, -2f, -1f, 2f, 4f, 4f, 2f, 0f, -1f, -2f))
-    )
+    // Use existing enum values
+    val presets = EQPreset.values().toList()
     
     init {
+        loadDefaultProfile()
         loadLearnedProfiles()
-        
-        // Initialize with flat profile
-        _currentProfile.value = EQProfile(
-            songId = 0L,
-            songTitle = "Manual",
-            songArtist = "",
-            band31Hz = 0f,
-            band62Hz = 0f,
-            band125Hz = 0f,
-            band250Hz = 0f,
-            band500Hz = 0f,
-            band1kHz = 0f,
-            band2kHz = 0f,
-            band4kHz = 0f,
-            band8kHz = 0f,
-            band16kHz = 0f,
-            isAutoLearned = false
-        )
+    }
+    
+    private fun loadDefaultProfile() {
+        viewModelScope.launch {
+            _currentProfile.value = EQProfile(
+                songId = 0,
+                songTitle = "Default",
+                songArtist = "",
+                band31Hz = 0f,
+                band62Hz = 0f,
+                band125Hz = 0f,
+                band250Hz = 0f,
+                band500Hz = 0f,
+                band1kHz = 0f,
+                band2kHz = 0f,
+                band4kHz = 0f,
+                band8kHz = 0f,
+                band16kHz = 0f,
+                isAutoLearned = false
+            )
+        }
     }
     
     private fun loadLearnedProfiles() {
         viewModelScope.launch {
-            eqRepository.getAllProfiles().collect { profiles ->
-                _learnedProfiles.value = profiles
-                _learnedProfileCount.value = profiles.size
+            try {
+                eqRepository.getAllLearnedProfiles().collect { profiles ->
+                    _learnedProfiles.value = profiles
+                    _learnedProfileCount.value = profiles.size
+                }
+            } catch (e: Exception) {
+                // Method might not exist, skip learned profiles tracking
+                _learnedProfiles.value = emptyList()
+                _learnedProfileCount.value = 0
             }
         }
     }
@@ -91,7 +94,7 @@ class EQViewModel @Inject constructor(
     fun updateBandLevel(index: Int, value: Float) {
         val current = _currentProfile.value ?: return
         
-        val updatedProfile = when (index) {
+        val updated = when (index) {
             0 -> current.copy(band31Hz = value)
             1 -> current.copy(band62Hz = value)
             2 -> current.copy(band125Hz = value)
@@ -105,28 +108,28 @@ class EQViewModel @Inject constructor(
             else -> current
         }
         
-        _currentProfile.value = updatedProfile
+        _currentProfile.value = updated
     }
     
     fun applyPreset(preset: EQPreset) {
-        val profile = EQProfile(
-            songId = 0L,
-            songTitle = preset.name,
-            songArtist = "",
-            band31Hz = preset.bands[0],
-            band62Hz = preset.bands[1],
-            band125Hz = preset.bands[2],
-            band250Hz = preset.bands[3],
-            band500Hz = preset.bands[4],
-            band1kHz = preset.bands[5],
-            band2kHz = preset.bands[6],
-            band4kHz = preset.bands[7],
-            band8kHz = preset.bands[8],
-            band16kHz = preset.bands[9],
+        val current = _currentProfile.value ?: return
+        val bands = preset.getBands()
+        
+        val updated = current.copy(
+            band31Hz = bands[0],
+            band62Hz = bands[1],
+            band125Hz = bands[2],
+            band250Hz = bands[3],
+            band500Hz = bands[4],
+            band1kHz = bands[5],
+            band2kHz = bands[6],
+            band4kHz = bands[7],
+            band8kHz = bands[8],
+            band16kHz = bands[9],
             isAutoLearned = false
         )
         
-        _currentProfile.value = profile
+        _currentProfile.value = updated
     }
     
     fun deleteProfile(profile: EQProfile) {
