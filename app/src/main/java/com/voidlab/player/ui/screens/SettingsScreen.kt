@@ -12,18 +12,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.voidlab.player.ui.theme.*
 
 @Composable
 fun SettingsScreen() {
-    var audioQuality by remember { mutableStateOf("High") }
-    var enableCrossfade by remember { mutableStateOf(false) }
-    var crossfadeDuration by remember { mutableStateOf(3f) }
-    var enableNotifications by remember { mutableStateOf(true) }
-    var themeBrightness by remember { mutableStateOf(50f) }
+    var showAboutDialog by remember { mutableStateOf(false) }
     
     Box(
         modifier = Modifier
@@ -40,7 +35,6 @@ fun SettingsScreen() {
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            // Header
             Text(
                 text = "SETTINGS",
                 style = MaterialTheme.typography.headlineMedium,
@@ -50,59 +44,120 @@ fun SettingsScreen() {
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            // Audio Settings
-            SettingsSection(title = "AUDIO") {
-                SettingsDropdown(
-                    icon = Icons.Default.HighQuality,
-                    label = "Audio Quality",
-                    value = audioQuality,
-                    options = listOf("Low", "Medium", "High", "Ultra"),
-                    onValueChange = { audioQuality = it }
+            // Playback Section
+            SettingsSection(title = "PLAYBACK") {
+                SettingItem(
+                    icon = Icons.Default.Speed,
+                    title = "Gapless Playback",
+                    description = "Seamless transitions between tracks",
+                    trailing = {
+                        Switch(
+                            checked = true,
+                            onCheckedChange = { },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = VoidCyan,
+                                checkedTrackColor = VoidCyan.copy(alpha = 0.5f)
+                            )
+                        )
+                    }
                 )
                 
-                SettingsSwitch(
-                    icon = Icons.Default.SwapHoriz,
-                    label = "Crossfade",
-                    description = "Smooth transition between tracks",
-                    checked = enableCrossfade,
-                    onCheckedChange = { enableCrossfade = it }
-                )
-                
-                if (enableCrossfade) {
-                    SettingsSlider(
-                        label = "Crossfade Duration",
-                        value = crossfadeDuration,
-                        valueRange = 0f..10f,
-                        steps = 19,
-                        onValueChange = { crossfadeDuration = it },
-                        valueLabel = "${crossfadeDuration.toInt()}s"
-                    )
-                }
+                // Audio quality setting REMOVED - VoidLab is ALWAYS maximum quality
             }
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Appearance Settings
+            // Appearance Section
             SettingsSection(title = "APPEARANCE") {
-                SettingsSlider(
-                    label = "Theme Brightness",
-                    value = themeBrightness,
-                    valueRange = 0f..100f,
-                    onValueChange = { themeBrightness = it },
-                    valueLabel = "${themeBrightness.toInt()}%"
+                SettingItem(
+                    icon = Icons.Default.Palette,
+                    title = "Theme",
+                    description = "Void Dark (Default)",
+                    trailing = {
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = VoidCyan.copy(alpha = 0.5f)
+                        )
+                    }
+                )
+                
+                SettingItem(
+                    icon = Icons.Default.ColorLens,
+                    title = "Accent Color",
+                    description = "Cyan",
+                    trailing = {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .background(VoidCyan, RoundedCornerShape(4.dp))
+                        )
+                    }
                 )
             }
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Notification Settings
-            SettingsSection(title = "NOTIFICATIONS") {
-                SettingsSwitch(
-                    icon = Icons.Default.Notifications,
-                    label = "Media Notifications",
-                    description = "Show playback controls in notification",
-                    checked = enableNotifications,
-                    onCheckedChange = { enableNotifications = it }
+            // Library Section
+            SettingsSection(title = "LIBRARY") {
+                SettingItem(
+                    icon = Icons.Default.Refresh,
+                    title = "Scan Library",
+                    description = "Refresh music collection",
+                    trailing = {
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = VoidCyan.copy(alpha = 0.5f)
+                        )
+                    }
+                )
+                
+                SettingItem(
+                    icon = Icons.Default.Folder,
+                    title = "Music Folders",
+                    description = "Manage scan locations",
+                    trailing = {
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = VoidCyan.copy(alpha = 0.5f)
+                        )
+                    }
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Auto EQ Section
+            SettingsSection(title = "AUTO EQ") {
+                SettingItem(
+                    icon = Icons.Default.AutoAwesome,
+                    title = "Learning Mode",
+                    description = "Automatically optimize EQ per song",
+                    trailing = {
+                        Switch(
+                            checked = true,
+                            onCheckedChange = { },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = VoidCyan,
+                                checkedTrackColor = VoidCyan.copy(alpha = 0.5f)
+                            )
+                        )
+                    }
+                )
+                
+                SettingItem(
+                    icon = Icons.Default.Delete,
+                    title = "Clear Learned Profiles",
+                    description = "Reset all Auto EQ data",
+                    trailing = {
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = VoidCyan.copy(alpha = 0.5f)
+                        )
+                    }
                 )
             }
             
@@ -110,21 +165,61 @@ fun SettingsScreen() {
             
             // About Section
             SettingsSection(title = "ABOUT") {
-                SettingsItem(
+                SettingItem(
                     icon = Icons.Default.Info,
-                    label = "Version",
-                    value = "1.0.0"
+                    title = "Version",
+                    description = "VoidLab 1.0.0",
+                    onClick = { showAboutDialog = true }
                 )
                 
-                SettingsItem(
-                    icon = Icons.Default.Copyright,
-                    label = "Build",
-                    value = "Void Lab Alpha"
+                SettingItem(
+                    icon = Icons.Default.Code,
+                    title = "Open Source",
+                    description = "View on GitHub",
+                    trailing = {
+                        Icon(
+                            Icons.Default.OpenInNew,
+                            contentDescription = null,
+                            tint = VoidCyan.copy(alpha = 0.5f)
+                        )
+                    }
                 )
             }
             
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+    
+    // About Dialog
+    if (showAboutDialog) {
+        AlertDialog(
+            onDismissRequest = { showAboutDialog = false },
+            containerColor = VoidBlackLight,
+            title = {
+                Text(
+                    "VoidLab",
+                    color = VoidCyan,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Version 1.0.0",
+                        color = VoidCyan.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        "A futuristic music player with Auto EQ learning, real-time visualizers, and studio-grade audio processing.",
+                        color = VoidCyan.copy(alpha = 0.7f)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAboutDialog = false }) {
+                    Text("OK", color = VoidCyan)
+                }
+            }
+        )
     }
 }
 
@@ -136,20 +231,19 @@ fun SettingsSection(
     Column {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = VoidCyan,
-            fontWeight = FontWeight.Bold
+            style = MaterialTheme.typography.titleSmall,
+            color = VoidCyan.copy(alpha = 0.7f),
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp)
         )
-        
-        Spacer(modifier = Modifier.height(8.dp))
         
         Surface(
             color = VoidBlackLight,
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier.padding(vertical = 4.dp)
             ) {
                 content()
             }
@@ -158,191 +252,60 @@ fun SettingsSection(
 }
 
 @Composable
-fun SettingsItem(
-    icon: ImageVector,
-    label: String,
-    value: String
+fun SettingItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    description: String? = null,
+    trailing: @Composable (() -> Unit)? = null,
+    onClick: (() -> Unit)? = null
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        onClick = onClick ?: {},
+        color = VoidBlackLight,
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = VoidCyan,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = VoidCyan
-            )
-        }
-        
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = VoidCyan.copy(alpha = 0.6f)
-        )
-    }
-}
-
-@Composable
-fun SettingsSwitch(
-    icon: ImageVector,
-    label: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = VoidCyan,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = VoidCyan
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = VoidCyan.copy(alpha = 0.6f)
-                )
-            }
-        }
-        
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = VoidCyan,
-                checkedTrackColor = VoidCyan.copy(alpha = 0.5f),
-                uncheckedThumbColor = VoidCyan.copy(alpha = 0.3f),
-                uncheckedTrackColor = VoidBlack
-            )
-        )
-    }
-}
-
-@Composable
-fun SettingsDropdown(
-    icon: ImageVector,
-    label: String,
-    value: String,
-    options: List<String>,
-    onValueChange: (String) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = VoidCyan,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = VoidCyan
-            )
-        }
-        
-        Box {
-            TextButton(onClick = { expanded = true }) {
-                Text(
-                    text = value,
-                    color = VoidCyan.copy(alpha = 0.8f)
-                )
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = null,
-                    tint = VoidCyan
-                )
-            }
-            
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                options.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option) },
-                        onClick = {
-                            onValueChange(option)
-                            expanded = false
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SettingsSlider(
-    label: String,
-    value: Float,
-    valueRange: ClosedFloatingPointRange<Float>,
-    steps: Int = 0,
-    onValueChange: (Float) -> Unit,
-    valueLabel: String
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = VoidCyan
-            )
-            Text(
-                text = valueLabel,
-                style = MaterialTheme.typography.bodyMedium,
-                color = VoidCyan.copy(alpha = 0.6f)
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = VoidCyan,
+                    modifier = Modifier.size(24.dp)
+                )
+                
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = title,
+                        color = VoidCyan,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    
+                    if (description != null) {
+                        Text(
+                            text = description,
+                            color = VoidCyan.copy(alpha = 0.6f),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+            
+            if (trailing != null) {
+                trailing()
+            }
         }
-        
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = valueRange,
-            steps = steps,
-            colors = SliderDefaults.colors(
-                thumbColor = VoidCyan,
-                activeTrackColor = VoidCyan,
-                inactiveTrackColor = VoidBlack
-            )
-        )
     }
 }
