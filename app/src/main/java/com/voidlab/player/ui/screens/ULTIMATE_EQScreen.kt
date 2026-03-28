@@ -26,10 +26,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.voidlab.player.ui.theme.*
 import com.voidlab.player.ui.viewmodels.EQViewModel
 import com.voidlab.player.ui.viewmodels.ViewMode
-import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -336,7 +336,6 @@ fun InteractiveCurveCanvas(
     freqLabels: List<String>,
     onBandChange: (Int, Float) -> Unit
 ) {
-    val density = LocalDensity.current
     var draggingIndex by remember { mutableStateOf<Int?>(null) }
     
     Canvas(
@@ -487,20 +486,6 @@ fun InteractiveCurveCanvas(
             end = Offset(width, centerY),
             strokeWidth = 2f
         )
-        
-        // Draw frequency labels
-        freqLabels.forEachIndexed { index, label ->
-            val x = index * bandWidth + bandWidth / 2
-            drawContext.canvas.nativeCanvas.apply {
-                val paint = android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#00FFF0")
-                    textSize = 28f
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-                }
-                drawText(label, x, height - 10f, paint)
-            }
-        }
     }
 }
 
